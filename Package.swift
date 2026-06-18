@@ -23,7 +23,7 @@ let package = Package(
         // existing `OCCTSwiftTools.X` references still resolve. Body picking
         // metadata convention (vertices / vertexIndices / edgeIndices)
         // preserved across the v1.0 cut — see OCCTSwiftTools#10.
-        .package(url: "https://github.com/gsdali/OCCTSwiftTools.git", from: "1.1.1"),
+        .package(url: "https://github.com/gsdali/OCCTSwiftTools.git", from: "1.1.2"),
     ],
     targets: [
         .target(
