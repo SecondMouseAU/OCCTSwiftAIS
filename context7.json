@@ -1,0 +1,17 @@
+{
+  "$schema": "https://context7.com/schema/context7.json",
+  "projectTitle": "OCCTSwiftAIS",
+  "description": "High-level Application Interactive Services for the OCCTSwift / OCCTSwiftViewport stack: selection-from-topology, translate/rotate manipulator widgets, dimension annotations, and standard scene objects, all in pure Swift for macOS / iOS / visionOS / tvOS. It sits at the top of the OCCT layered architecture, above OCCTSwiftTools, adding scene-management semantics over OCCTSwiftViewport's native Metal renderer.",
+  "folders": ["docs", "Sources/OCCTSwiftAIS"],
+  "excludeFolders": ["Tests", ".build"],
+  "rules": [
+    "Import the package with `import OCCTSwiftAIS`; it transitively pulls OCCTSwift, OCCTSwiftViewport, and OCCTSwiftTools, so you usually `import OCCTSwift` and `import OCCTSwiftViewport` alongside it.",
+    "OCCTSwiftAIS is the interactive-services (AIS) layer at the top of the OCCT layered stack: OCCTSwift (B-Rep kernel) and OCCTSwiftViewport (Metal renderer) are the kernels, OCCTSwiftTools is the Shape<->ViewportBody bridge, and OCCTSwiftAIS sits above OCCTSwiftTools adding selection, manipulators, and dimensions.",
+    "`InteractiveContext(viewport: ViewportController())` is the per-scene state object (@MainActor, ObservableObject). Bind it to the renderer with `MetalViewportView(controller: ctx.viewport, bodies: $ctx.bodies)`; display shapes with `ctx.display(shape)` which returns an `InteractiveObject`.",
+    "Selection modes are a `Set<SelectionMode>` of `.body`, `.face`, `.edge`, `.vertex` on `context.selectionMode` (changing it clears the selection). The `@Published` `selection: Selection` exposes `.faces` ([Face]), `.edges` ([Edge]), `.vertices` ([SIMD3<Double>]), and `.bodies`. A pick replaces the selection; `select`/`deselect`/`clearSelection` mutate it additively (Set semantics).",
+    "`ManipulatorWidget(target:mode:)` is a translate or rotate gizmo (Mode.scale is reserved). Call `install(in: context)` to add the handles, drive it with `hitTest(ndc:camera:aspect:)` + `beginDrag`/`updateDrag`/`endDrag` (NDC is [-1,1], +Y up), and observe `transform`/`onChange`/`onCommit`. Use `snapTranslate` / `snapRotateDeg` for snapping; `uninstall()` restores the pre-install transform.",
+    "For SwiftUI, the `.attachManipulator(_:)` View modifier (Manipulator+SwiftUI.swift) wraps a viewport view with a high-priority drag gesture that drives the widget on a handle grab and orbits the camera otherwise; the widget must already be install(in:)-ed.",
+    "Dimensions conform to the `Dimension` protocol: `LinearDimension(from:to:plane:)` (optional WorkPlane projection), `AngularDimension(arms:apex:)`, and `RadialDimension(circularEdge:showDiameter:)`. Add them with `context.add(_:)`, remove with `remove(_:)`, and call `refreshDimensionMeasurement(_:)` after anchors move; they render via OCCTSwiftViewport's MeasurementOverlay.",
+    "Standard non-selectable scene objects (`Trihedron`, `WorkPlane`, `Axis`, `PointCloudPresentation`) build `ViewportBody`s via `makeBodies()` that you append to `context.bodies`; each has an `ownsBody(id:)` predicate for cleanup. Style displayed objects with `PresentationStyle` (presets `.default`/`.ghosted`/`.highlighted`/`.hovered`) and the highlight overlay with `HighlightStyle`. `InteractiveContext.remap(_:using:rebindingTo:strategy:)` carries a Selection across a Shape mutation using a TopologyGraph's history records (RemapStrategy `.dropMissing` / `.keepUnchanged`)."
+  ]
+}

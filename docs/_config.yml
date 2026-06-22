@@ -1,0 +1,12 @@
+title: OCCTSwiftAIS
+description: Application Interactive Services — selection, manipulators, dimensions, and standard scene objects for the OCCTSwift / OCCTSwiftViewport stack.
+remote_theme: just-the-docs/just-the-docs@v0.3.3
+search_enabled: true
+heading_anchors: true
+aux_links:
+  "GitHub": ["https://github.com/SecondMouseAU/OCCTSwiftAIS"]
+aux_links_new_tab: true
+exclude:
+  - "*.sh"
+  - Gemfile
+  - Gemfile.lock
