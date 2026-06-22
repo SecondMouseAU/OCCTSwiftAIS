@@ -1,0 +1,10 @@
+okf_version: 1
+repo: OCCTSwiftAIS
+cluster: kernel
+visibility: public
+status: active
+language: Swift
+summary: High-level Application Interactive Services for the OCCTSwift stack — selection-from-topology, manipulator widgets, dimensions, and standard scene objects.
+products: []
+depends_on: [OCCTSwiftTools]
+maintainer: gsdali
