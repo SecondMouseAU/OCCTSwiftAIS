@@ -1,24 +1,35 @@
+---
+title: Getting Started
+nav_order: 4
+---
+
 # Getting started with OCCTSwiftAIS
 
-A walkthrough that builds up a SwiftUI CAD viewer from a blank `MetalViewportView` to one with face selection, a translate gizmo, and a linear dimension. Everything in this guide compiles against `OCCTSwiftAIS` v0.7.2.
+A walkthrough that builds up a SwiftUI CAD viewer from a blank `MetalViewportView` to one with face
+selection, a translate gizmo, and a linear dimension. Everything in this guide uses the real
+`OCCTSwiftAIS` public API.
 
-If you just want to see one snippet, the [README's 30-second example](../README.md#30-second-example) is enough. This guide is for "I want to understand each moving piece".
+If you just want one snippet, the [Home page hero example](../index.md) is enough. This guide is for
+"I want to understand each moving piece".
 
 ## 1. Add the package
 
 ```swift
 // Package.swift
-.package(url: "https://github.com/gsdali/OCCTSwiftAIS.git", from: "0.7.2"),
+.package(url: "https://github.com/SecondMouseAU/OCCTSwiftAIS.git", from: "1.0.3"),
 ```
 
-Then `.product(name: "OCCTSwiftAIS", package: "OCCTSwiftAIS")` on your target. AIS pulls `OCCTSwiftTools`, `OCCTSwiftViewport`, and `OCCTSwift` transitively — no need to declare them separately.
+Then add `.product(name: "OCCTSwiftAIS", package: "OCCTSwiftAIS")` to your target. AIS pulls
+`OCCTSwiftTools`, `OCCTSwiftViewport`, and `OCCTSwift` transitively — no need to declare them
+separately.
 
 ## 2. The two top-level objects
 
 Every interactive scene has exactly two:
 
 - **`ViewportController`** — owns camera, lighting, and the GPU pick pipeline. From `OCCTSwiftViewport`.
-- **`InteractiveContext`** — owns the *scene state*: which `Shape`s are displayed, what's selected, what's hovered, which dimensions exist. Built on top of one `ViewportController`.
+- **`InteractiveContext`** — owns the *scene state*: which `Shape`s are displayed, what's selected,
+  what's hovered, which dimensions exist. Built on top of one `ViewportController`.
 
 ```swift
 import SwiftUI
@@ -36,11 +47,14 @@ struct CADView: View {
 }
 ```
 
-`$ais.bodies` is the `Binding<[ViewportBody]>` `MetalViewportView` expects. `ais.viewport` is the controller you created.
+`$ais.bodies` is the `Binding<[ViewportBody]>` `MetalViewportView` expects. `ais.viewport` is the
+controller you created.
 
 ## 3. Display a shape
 
-`InteractiveContext.display(_:)` tessellates an OCCTSwift `Shape` and adds it to the scene. It returns an `InteractiveObject` — a UUID-keyed scene handle you can pass back to AIS later (to remove the body, attach a manipulator, or anchor a dimension).
+`InteractiveContext.display(_:style:)` tessellates an OCCTSwift `Shape` and adds it to the scene. It
+returns an `InteractiveObject` — a UUID-keyed scene handle you can pass back to AIS later (to remove
+the body, attach a manipulator, or anchor a dimension).
 
 ```swift
 .onAppear {
@@ -68,8 +82,10 @@ Built-in presets: `.default`, `.ghosted`, `.highlighted`, `.hovered`.
 
 Selection has two moving parts:
 
-- **`selectionMode: Set<SelectionMode>`** — what *kinds* of pick produce a selection. Any combination of `.body`, `.face`, `.edge`, `.vertex`.
-- **`selection: Selection`** — what's currently selected. Observable via SwiftUI's `onChange`.
+- **`selectionMode: Set<SelectionMode>`** — what *kinds* of pick produce a selection. Any combination
+  of `.body`, `.face`, `.edge`, `.vertex`.
+- **`selection: Selection`** — what's currently selected. Observable via SwiftUI's `onChange` (it's
+  `@Published`).
 
 ```swift
 .onAppear {
@@ -98,14 +114,18 @@ The derived accessors:
 | `selection.vertices` | `[SIMD3<Double>]` | `shape.vertex(at:)` |
 | `selection.bodies` | `Set<InteractiveObject>` | distinct objects across all entries |
 
-A click **replaces** the selection with the picked sub-shape. Empty-space clicks leave the selection alone. To accumulate, call `ais.select(_:)` / `ais.deselect(_:)` directly — those are additive (`Set` semantics, idempotent). `ais.clearSelection()` empties it.
+A click **replaces** the selection with the picked sub-shape. Empty-space clicks leave the selection
+alone. To accumulate, call `ais.select(_:)` / `ais.deselect(_:)` directly — those are additive (`Set`
+semantics, idempotent). `ais.clearSelection()` empties it.
 
 Changing `selectionMode` also clears the current selection.
 
 ### Body-level vs face-level highlighting
 
-- `.body` selections push the body's id to `viewport.selectedBodyIDs` — the renderer's built-in body highlight kicks in.
-- `.face` selections write per-triangle style entries to the source body's `triangleStyles`, composited by the renderer's highlight pass. Color comes from `HighlightStyle.selectionColor`.
+- `.body` selections push the body's id to `viewport.selectedBodyIDs` — the renderer's built-in body
+  highlight kicks in.
+- `.face` selections write per-triangle style entries to the source body's `triangleStyles`,
+  composited by the renderer's highlight pass. Color comes from `HighlightStyle.selectionColor`.
 
 Tweak the highlight color:
 
@@ -119,13 +139,15 @@ ais.setHighlightStyle(HighlightStyle(
 
 ## 5. Manipulator widgets
 
-A `ManipulatorWidget` is a translate or rotate gizmo bound to one `InteractiveObject`. You install it into an `InteractiveContext`; uninstall removes it cleanly and restores any pre-install transform on the target.
+A `ManipulatorWidget` is a translate or rotate gizmo bound to one `InteractiveObject`. You install it
+into an `InteractiveContext`; uninstall removes it cleanly and restores any pre-install transform on
+the target.
 
 ```swift
 @StateObject private var ais  = InteractiveContext(viewport: ViewportController())
 @State        private var widget: ManipulatorWidget? = nil
 
-// On appear or wherever you decide a manipulator should appear:
+// On appear, or wherever you decide a manipulator should appear:
 let part = ais.display(Shape.box(width: 10, height: 5, depth: 3)!)
 let w = ManipulatorWidget(target: part, mode: .translate)
 w.size = 6                                      // arrow length in world units
@@ -136,13 +158,17 @@ w.install(in: ais)
 widget = w
 ```
 
-The widget reports a `simd_float4x4` `transform`; during drag the *target body* gets `body.transform = preInstallTransform * widget.transform` so the user sees the part move in real time. On `onCommit` you typically transform the underlying `Shape` and re-display it.
+The widget reports a `simd_float4x4` `transform`; during drag the *target body* gets
+`body.transform = preInstallTransform * widget.transform` so the user sees the part move in real time.
+On `onCommit` you typically transform the underlying `Shape` and re-display it.
 
-For rotate, swap `mode: .rotate`, set `snapRotateDeg` instead of `snapTranslate`, and the gizmo renders three torus rings (X / Y / Z) at the target's centroid.
+For rotate, swap `mode: .rotate`, set `snapRotateDeg` instead of `snapTranslate`, and the gizmo
+renders three torus rings (X / Y / Z) at the target's centroid.
 
 ### SwiftUI integration
 
-`.attachManipulator(_:)` wraps `MetalViewportView` with a `.highPriorityGesture(DragGesture)` that hit-tests the widget on touch-down:
+`.attachManipulator(_:)` wraps `MetalViewportView` with a `.highPriorityGesture(DragGesture)` that
+hit-tests the widget on touch-down:
 
 ```swift
 var body: some View {
@@ -157,7 +183,9 @@ var body: some View {
 }
 ```
 
-Drags on a handle drive the widget; drags off any handle forward to `controller.handleOrbit(translation:)` so the camera responds normally. Pinch / tap gestures still go to `MetalViewportView`'s own handlers.
+Drags on a handle drive the widget; drags off any handle forward to `viewport.handleOrbit(translation:)`
+so the camera responds normally. The widget must already be `install(in:)`-ed — the modifier reads
+`widget.context` to find the viewport.
 
 If you want full manual control (e.g. a custom gesture stack), use the widget API directly:
 
@@ -179,7 +207,8 @@ widget.endDrag(commit: true)
 
 A `Dimension` is a labeled measurement anchored on sub-shapes. Three concrete types:
 
-- `LinearDimension(from:to:plane:?)` — distance between two anchors. Optional `WorkPlane` projects both anchors orthogonally before measuring.
+- `LinearDimension(from:to:plane:?)` — distance between two anchors. Optional `WorkPlane` projects
+  both anchors orthogonally before measuring.
 - `AngularDimension(arms:apex:)` — angle at the apex.
 - `RadialDimension(circularEdge:showDiameter:?)` — radius (or diameter) of a circular edge.
 
@@ -209,7 +238,9 @@ for i in 0..<part.shape.edgeCount {
 }
 ```
 
-Each dimension emits a `ViewportMeasurement` (distance / angle / radius) into `viewport.measurements`. The renderer's existing `MeasurementOverlay` SwiftUI Canvas draws leader lines + a billboarded label; AIS owns only the topology-aware anchor resolution.
+Each dimension emits a `ViewportMeasurement` (distance / angle / radius) into `viewport.measurements`.
+The renderer's existing `MeasurementOverlay` SwiftUI Canvas draws leader lines + a billboarded label;
+AIS owns only the topology-aware anchor resolution.
 
 To re-evaluate after the underlying anchors moved (e.g. you mutated the `Shape`):
 
@@ -217,7 +248,8 @@ To re-evaluate after the underlying anchors moved (e.g. you mutated the `Shape`)
 ais.refreshDimensionMeasurement(lin)
 ```
 
-`ais.remove(lin)` drops the dimension; `ais.removeAll()` clears every body, selection, and dimension in one go.
+`ais.remove(lin)` drops the dimension; `ais.removeAll()` clears every body, selection, and dimension
+in one go.
 
 ### Anchor resolution by sub-shape kind
 
@@ -228,7 +260,8 @@ ais.refreshDimensionMeasurement(lin)
 | `.edge(_, idx)` | midpoint of `Edge.endpoints` |
 | `.vertex(_, idx)` | `Shape.vertex(at: idx)` |
 
-These are constant-time lookups. Curved-face area-weighted centroids and arc-length edge midpoints are future refinements.
+These are constant-time lookups. Curved-face area-weighted centroids and arc-length edge midpoints are
+future refinements.
 
 ## 7. Standard scene objects
 
@@ -259,9 +292,11 @@ ais.bodies.removeAll { tri.ownsBody(id: $0.id) }
 
 ## 8. Selection survival across `Shape` mutation
 
-`SubShape.face(_, faceIndex: 5)` only means "face 5" while the underlying `Shape` is unchanged. After a boolean op or a fillet, indices renumber.
+`SubShape.face(_, faceIndex: 5)` only means "face 5" while the underlying `Shape` is unchanged. After
+a boolean op or a fillet, indices renumber.
 
-`InteractiveContext.remap(_:using:rebindingTo:)` translates an old `Selection` to a new shape's indices using OCCTSwift's history records on a `TopologyGraph`:
+`InteractiveContext.remap(_:using:rebindingTo:strategy:)` translates an old `Selection` to a new
+shape's indices using OCCTSwift's history records on a `TopologyGraph`:
 
 ```swift
 let oldShape = Shape.box(width: 10, height: 10, depth: 10)!
@@ -291,35 +326,16 @@ for sub in remapped.subshapes {
 `RemapStrategy` controls what happens for sub-shapes the history doesn't mention:
 
 - `.dropMissing` (default) — drop them. Safest.
-- `.keepUnchanged` — preserve the original index. Only safe if you know the operation didn't shift ordering (attribute-only edits, in-place transforms).
+- `.keepUnchanged` — preserve the original index. Only safe if you know the operation didn't shift
+  ordering (attribute-only edits, in-place transforms).
 
-The 1-to-N case — e.g. an edge split by a fillet — automatically expands: a single `.edge(_, edgeIndex: 0)` in the old selection becomes two entries in the new one if the history records two replacements.
-
-## 9. Testing tips
-
-OCCT's `NCollection` has a known race condition on arm64 macOS that segfaults parallel test runs. Always:
-
-```bash
-OCCT_SERIAL=1 swift test --parallel --num-workers 1
-```
-
-To synthesize a `PickResult` in a test (e.g. to verify the end-to-end pick → `Selection` flow without an actual GPU readback):
-
-```swift
-import OCCTSwiftViewport
-@testable import OCCTSwiftAIS
-
-let raw = UInt32(bodyIndex & 0xFFFF)
-        | (UInt32(primitiveIndex & 0x3FFF) << 16)
-        | (UInt32(PrimitiveKind.face.rawValue) << 30)
-let pick = PickResult(rawValue: raw, indexMap: [bodyIndex: bodyID])!
-ctx.handlePick(pick)
-```
-
-The 14-bit / 16-bit / 2-bit packing matches the renderer's encoding.
+The 1-to-N case — e.g. an edge split by a fillet — automatically expands: a single
+`.edge(_, edgeIndex: 0)` in the old selection becomes two entries in the new one if the history
+records two replacements.
 
 ## Where to next
 
-- [SPEC.md](../SPEC.md) — the original design brief; useful when something here doesn't make sense and you want to see why.
-- [docs/CHANGELOG.md](CHANGELOG.md) — what shipped per release.
-- The test suites under `Tests/OCCTSwiftAISTests/` are the most exhaustive worked examples of the public API in real code.
+- The [Cookbook](cookbook/) — focused recipes per task.
+- The [API Reference](../reference/) — every public symbol with real signatures.
+- [SPEC.md](https://github.com/SecondMouseAU/OCCTSwiftAIS/blob/main/SPEC.md) — the original design brief.
+- [CHANGELOG.md](../CHANGELOG.md) — what shipped per release.

@@ -1,3 +1,8 @@
+---
+title: Changelog
+nav_order: 5
+---
+
 # Changelog
 
 Most recent first. Pre-1.0: free to break; deprecations documented here.
