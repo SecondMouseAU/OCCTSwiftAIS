@@ -27,3 +27,7 @@ See [`components/`](components/index.md) for the public surface.
 ## References
 
 See [`references/`](references/index.md) for docs, the Swift Package Index page, and OpenCASCADE upstream.
+
+## Policies
+
+- [Query `context` first for OCCT / OCCTSwift docs](policies/context-first.md)
