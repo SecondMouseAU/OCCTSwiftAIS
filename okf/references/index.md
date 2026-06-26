@@ -9,7 +9,7 @@ timestamp: 2026-06-22
 
 # References
 
-- **Getting started** — selection, manipulators, dimensions, and standard objects in one walkthrough; see [`docs/getting-started.md`](../../docs/getting-started.md).
+- **Getting started** — selection, manipulators, dimensions, and standard objects in one walkthrough; see [`docs/guides/getting-started.md`](../../docs/guides/getting-started.md).
 - **SPEC** — design rationale and the v0.x → v1.0 trajectory; see [`SPEC.md`](../../SPEC.md).
 - **Changelog** — per-release notes; see [`docs/CHANGELOG.md`](../../docs/CHANGELOG.md).
 - **Swift Package Index** — package page driven by `.spi.yml` (DocC target `OCCTSwiftAIS`). <https://swiftpackageindex.com/SecondMouseAU/OCCTSwiftAIS>
