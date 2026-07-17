@@ -1,10 +1,12 @@
 # OCCTSwiftAIS
 
+[![Swift](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2FSecondMouseAU%2FOCCTSwiftAIS%2Fbadge%3Ftype%3Dswift-versions)](https://swiftpackageindex.com/SecondMouseAU/OCCTSwiftAIS)
+[![Platforms](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2FSecondMouseAU%2FOCCTSwiftAIS%2Fbadge%3Ftype%3Dplatforms)](https://swiftpackageindex.com/SecondMouseAU/OCCTSwiftAIS)
 [![License](https://img.shields.io/badge/license-LGPL--2.1-blue)](LICENSE)
 
 High-level **Application Interactive Services** for the OCCTSwift / OCCTSwiftViewport stack — selection-from-topology, manipulator widgets, dimension annotations, and standard scene objects, all in pure Swift.
 
-Part of the [OCCTSwift ecosystem](https://github.com/gsdali/OCCTSwift/blob/main/docs/ecosystem.md) — see the ecosystem map for how this package fits with the kernel, viewport, and sibling layers.
+Part of the [OCCTSwift ecosystem](https://github.com/SecondMouseAU/OCCTSwift/blob/main/docs/ecosystem.md) — see the ecosystem map for how this package fits with the kernel, viewport, and sibling layers.
 
 > Current: **v1.0.0**. SemVer-stable from this tag, pinned alongside OCCTSwift v1.0.0 (OCCT 8.0.0 GA cohort). See [SPEC.md](SPEC.md) for the design brief and [docs/CHANGELOG.md](docs/CHANGELOG.md) for per-release notes.
 
@@ -21,7 +23,7 @@ Part of the [OCCTSwift ecosystem](https://github.com/gsdali/OCCTSwift/blob/main/
 ## Installation
 
 ```swift
-.package(url: "https://github.com/gsdali/OCCTSwiftAIS.git", from: "0.7.2"),
+.package(url: "https://github.com/SecondMouseAU/OCCTSwiftAIS.git", from: "1.0.4"),
 ```
 
 `OCCTSwiftAIS` transitively pulls `OCCTSwiftTools`, `OCCTSwiftViewport`, and `OCCTSwift`.
@@ -68,7 +70,7 @@ OCCTSwift  OCCTSwiftViewport
 (B-Rep)    (Metal)
 ```
 
-OCCTSwiftAIS adds **scene-management semantics** an OCCT-style API expects (selection-on-topology, manipulators, dimensions) as a thin Swift layer on top of OCCTSwiftViewport's native Metal renderer. It is **not** a port of OCCT's `TKV3d` / `TKService` / `TKOpenGl` toolkits — see [`OCCTSwift/docs/visualization-research.md`](https://github.com/gsdali/OCCTSwift/blob/main/docs/visualization-research.md) for why.
+OCCTSwiftAIS adds **scene-management semantics** an OCCT-style API expects (selection-on-topology, manipulators, dimensions) as a thin Swift layer on top of OCCTSwiftViewport's native Metal renderer. It is **not** a port of OCCT's `TKV3d` / `TKService` / `TKOpenGl` toolkits — see [`OCCTSwift/docs/visualization-research.md`](https://github.com/SecondMouseAU/OCCTSwift/blob/main/docs/visualization-research.md) for why.
 
 ## Supported platforms
 
@@ -87,7 +89,7 @@ Same floor as OCCTSwiftViewport.
 - [SPEC.md](SPEC.md) — design rationale and the v0.x → v1.0 trajectory.
 - [docs/CHANGELOG.md](docs/CHANGELOG.md) — what shipped in each release.
 
-Sibling repos: [OCCTSwift](https://github.com/gsdali/OCCTSwift) (B-Rep kernel), [OCCTSwiftViewport](https://github.com/gsdali/OCCTSwiftViewport) (Metal renderer), [OCCTSwiftTools](https://github.com/gsdali/OCCTSwiftTools) (Shape ↔ ViewportBody bridge).
+Sibling repos: [OCCTSwift](https://github.com/SecondMouseAU/OCCTSwift) (B-Rep kernel), [OCCTSwiftViewport](https://github.com/SecondMouseAU/OCCTSwiftViewport) (Metal renderer), [OCCTSwiftTools](https://github.com/SecondMouseAU/OCCTSwiftTools) (Shape ↔ ViewportBody bridge).
 
 ## License
 
