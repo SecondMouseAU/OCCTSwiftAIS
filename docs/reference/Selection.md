@@ -70,17 +70,17 @@ A durable handle to a picked sub-shape, carried by every `.face` / `.edge` / `.v
 ```swift
 public struct SubShapeRef: Hashable, Sendable {
     public let shape: Shape
-    public let uid: TopologyGraph.GraphUID?
+    public let uid: BRepGraph.GraphUID?
     public let ordinal: Int
 
-    public init(shape: Shape, uid: TopologyGraph.GraphUID? = nil, ordinal: Int)
+    public init(shape: Shape, uid: BRepGraph.GraphUID? = nil, ordinal: Int)
 }
 ```
 
 - **`shape`:** the resolved sub-shape itself, captured once at pick time. Use this for geometry
   queries — `Selection.faces` / `.edges` / `.vertices` resolve from it directly, no re-derivation via
   `Shape.subShape(type:index:)` on `ordinal`.
-- **`uid`:** a `TopologyGraph.GraphUID`, minted when a graph was in hand at pick time. This is what
+- **`uid`:** a `BRepGraph.GraphUID`, minted when a graph was in hand at pick time. This is what
   `InteractiveContext.remap(_:using:rebindingTo:)` resolves through — it survives a mutation that
   `ordinal` alone does not. `nil` when no graph was available; such a sub-shape has nothing durable to
   remap by and is dropped.

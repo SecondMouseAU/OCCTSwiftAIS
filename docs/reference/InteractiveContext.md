@@ -71,7 +71,7 @@ let part = ais.display(Shape.box(width: 10, height: 5, depth: 3)!,
                        style: .highlighted)
 ```
 
-`display` also builds a `TopologyGraph` from `shape` and retains it for the object's lifetime — see
+`display` also builds a `BRepGraph` from `shape` and retains it for the object's lifetime — see
 `update(_:to:absorbing:operationName:)`, below, for what that's for.
 
 ---
@@ -80,7 +80,7 @@ let part = ais.display(Shape.box(width: 10, height: 5, depth: 3)!,
 
 Update a displayed object after a modelling operation that rebuilds its shape — a boolean, a fillet, a
 chamfer, anything produced via one of OCCTSwift's `*WithFullHistory` methods run against `object.shape`.
-Absorbs the operation's history into the object's living `TopologyGraph` (built once in `display`,
+Absorbs the operation's history into the object's living `BRepGraph` (built once in `display`,
 retained across every subsequent `update` call — the input and result share one graph instance, so
 every `SubShapeRef.uid` already held stays resolvable), rebuilds the displayed mesh, and remaps any
 current `selection` / `hover` sub-shapes referencing `object` forward via `remap(_:using:rebindingTo:)`.
@@ -328,19 +328,19 @@ ais.refreshDimensionMeasurement(lin)
 
 Remap a `Selection` whose sub-shapes were captured against an earlier shape state into a new
 `Selection` against `newObject`, using history absorbed into `graph` via
-`TopologyGraph.add(_:absorbing:inputRoots:operationName:)`. This is the lower-level primitive
+`BRepGraph.add(_:absorbing:inputRoots:operationName:)`. This is the lower-level primitive
 `update(_:to:absorbing:operationName:)` calls internally — reach for it directly only if you're
-managing the `TopologyGraph` yourself rather than going through `update`.
+managing the `BRepGraph` yourself rather than going through `update`.
 
 ```swift
 public func remap(
     _ selection: Selection,
-    using graph: TopologyGraph,
+    using graph: BRepGraph,
     rebindingTo newObject: InteractiveObject
 ) -> Selection
 ```
 
-- **Parameters:** `selection` — the pre-mutation selection; `graph` — the `TopologyGraph` that absorbed
+- **Parameters:** `selection` — the pre-mutation selection; `graph` — the `BRepGraph` that absorbed
   the operation's history (input and result must share this one instance); `newObject` — the
   post-mutation scene object the result references.
 - **Returns:** a `Selection` against `newObject`, resolved through each sub-shape's `SubShapeRef.uid` —
@@ -364,7 +364,7 @@ opposed to simply never being mentioned by any recorded operation. `remap`'s sil
 these apart on its own; both look like "absent from the result."
 
 ```swift
-public func isDeleted(_ subshape: SubShape, in graph: TopologyGraph) -> Bool
+public func isDeleted(_ subshape: SubShape, in graph: BRepGraph) -> Bool
 ```
 
 - **Returns:** `false` for `.body` sub-shapes, and for any sub-shape with no `uid` or whose `uid` isn't

@@ -7,6 +7,14 @@ nav_order: 5
 
 Most recent first. Breaking changes and deprecations documented here.
 
+## v1.3.1 — 2026-07-20
+
+Housekeeping: migrate off deprecated `TopologyGraph` → `BRepGraph`. Closes [#37](https://github.com/SecondMouseAU/OCCTSwiftAIS/issues/37). No behaviour change — pure rename, underlying type unchanged.
+
+OCCTSwift renamed `TopologyGraph` → `BRepGraph` (too close to `TopoDS`, caused naming confusion — SecondMouseAU/OCCTSwift#333, shipped v1.15.0) and left a deprecated typealias in place. Mechanical rename across every reference in this repo: `Sources/OCCTSwiftAIS/{Remap,InteractiveContext,InteractiveObject}.swift`, `Tests/OCCTSwiftAISTests/{InteractiveContextMutationTests,RemapTests,SubShapeTests,TestSupport}.swift`, and every doc that names the type in a current code snippet (`SPEC.md`, `README.md`, `docs/guides/getting-started.md`, `docs/guides/cookbook/selecting-subshapes.md`, `docs/reference/{Selection,InteractiveContext}.md`) — this changelog's own history is left as-written.
+
+**Tests:** 193 across 17 suites, all green, zero deprecation warnings (was ~30+ across the build).
+
 ## v1.3.0 — 2026-07-20
 
 Rectangle and lasso area selection. Closes [#33](https://github.com/SecondMouseAU/OCCTSwiftAIS/issues/33).

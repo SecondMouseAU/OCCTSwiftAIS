@@ -72,7 +72,7 @@ public final class InteractiveContext: ObservableObject {
         /// Living per-object graph, built once at `display(_:style:)` and
         /// retained across `update(_:to:absorbing:operationName:)` calls so
         /// `GraphUID`s minted at pick time keep resolving — see Remap.swift.
-        let graph: TopologyGraph?
+        let graph: BRepGraph?
         var style: PresentationStyle
     }
     private var entriesByID: [UUID: Entry] = [:]
@@ -108,7 +108,7 @@ public final class InteractiveContext: ObservableObject {
 
     /// Display a shape with topology-aware selection enabled.
     ///
-    /// Builds a `TopologyGraph` from `shape` and retains it for the object's
+    /// Builds a `BRepGraph` from `shape` and retains it for the object's
     /// lifetime — see `update(_:to:absorbing:operationName:)` for how it's used
     /// to carry a selection across a later mutation. Graph construction can
     /// fail on pathological shapes; when it does, the object still displays but
@@ -120,7 +120,7 @@ public final class InteractiveContext: ObservableObject {
         let bodyID = "ais.\(object.id.uuidString)"
         let rgba = SIMD4<Float>(style.color, 1.0 - style.transparency)
 
-        let graph = TopologyGraph(shape: shape)
+        let graph = BRepGraph(shape: shape)
         graph?.isHistoryEnabled = true
 
         let (body, metadata, faceIdentity, edgeIdentity, vertexIdentity) = CADFileLoader.shapeToBodyMetadataAndIdentities(
@@ -145,10 +145,10 @@ public final class InteractiveContext: ObservableObject {
     /// shape — a boolean, a fillet, a chamfer, anything produced via one of
     /// OCCTSwift's `*WithFullHistory` methods run against `object.shape`.
     ///
-    /// Absorbs the operation's history into the object's living `TopologyGraph`
+    /// Absorbs the operation's history into the object's living `BRepGraph`
     /// (built once in `display(_:style:)`, retained here across calls — the
     /// input and result share one graph instance, so every `GraphUID` already
-    /// held stays resolvable; see `TopologyGraph.add(_:absorbing:inputRoots:operationName:)`),
+    /// held stays resolvable; see `BRepGraph.add(_:absorbing:inputRoots:operationName:)`),
     /// rebuilds the displayed mesh for `newShape`, and remaps any current
     /// `selection` / `hover` sub-shapes referencing `object` forward via
     /// `remap(_:using:rebindingTo:)`.
@@ -172,7 +172,7 @@ public final class InteractiveContext: ObservableObject {
     ) -> InteractiveObject? {
         guard let entry = entriesByID[object.id], let graph = entry.graph else { return nil }
         guard let inputRoot = graph.findNode(for: entry.object.shape) else { return nil }
-        let rootRef = TopologyGraph.NodeRef(kind: inputRoot.kind, index: inputRoot.index)
+        let rootRef = BRepGraph.NodeRef(kind: inputRoot.kind, index: inputRoot.index)
         guard graph.add(newShape, absorbing: history, inputRoots: [rootRef], operationName: operationName) != nil else {
             return nil
         }

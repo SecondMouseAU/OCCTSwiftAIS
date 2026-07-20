@@ -32,9 +32,9 @@ public struct InteractiveObject: Hashable, Sendable {
 ///   That round-trip is exactly the coincidence SPEC.md warns about: a
 ///   render-path ordinal need not agree with `Shape`'s own sub-shape enumeration
 ///   once a sub-shape is shared between shells (see OCCTSwiftTools#42).
-/// - `uid` — a `TopologyGraph.GraphUID`, minted when a graph was in hand at pick
+/// - `uid` — a `BRepGraph.GraphUID`, minted when a graph was in hand at pick
 ///   time. This is the durable identity: it survives `InteractiveContext.remap`
-///   across a mutation via `TopologyGraph.add(_:absorbing:inputRoots:operationName:)`.
+///   across a mutation via `BRepGraph.add(_:absorbing:inputRoots:operationName:)`.
 ///   `nil` when no graph was available — remap then has nothing durable to
 ///   resolve the sub-shape by and drops it.
 /// - `ordinal` — the tessellation-time render-path index. Ephemeral: valid only
@@ -42,10 +42,10 @@ public struct InteractiveObject: Hashable, Sendable {
 ///   per-triangle buffers by it). Never compare sub-shapes by ordinal alone.
 public struct SubShapeRef: Sendable {
     public let shape: Shape
-    public let uid: TopologyGraph.GraphUID?
+    public let uid: BRepGraph.GraphUID?
     public let ordinal: Int
 
-    public init(shape: Shape, uid: TopologyGraph.GraphUID? = nil, ordinal: Int) {
+    public init(shape: Shape, uid: BRepGraph.GraphUID? = nil, ordinal: Int) {
         self.shape = shape
         self.uid = uid
         self.ordinal = ordinal
