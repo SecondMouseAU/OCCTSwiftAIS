@@ -35,13 +35,13 @@ let package = Package(
         ),
     ],
     dependencies: [
-        // Brings in OCCTSwift and OCCTSwiftViewport transitively. Tools 1.5.0
-        // re-pins the cohort onto current OCCTSwift (1.12.9+) and ships
-        // `shapeToBodyMetadataAndIdentity(...graph:)` + `FaceIdentityTable`
-        // (OCCTSwiftTools#42), which durable sub-shape identity in this repo
-        // (`SubShapeRef.uid`, `InteractiveContext.update`/`remap`) is built on
-        // — see #31.
-        occtDep("OCCTSwiftTools", from: "1.5.0"),
+        // Brings in OCCTSwift and OCCTSwiftViewport transitively. Tools 1.6.0
+        // adds `EdgeIdentityTable` / `VertexIdentityTable` +
+        // `shapeToBodyMetadataAndIdentities(...)` (OCCTSwiftTools#43/#44),
+        // closing the "edge/vertex uid minted ad hoc" gap #31 shipped with —
+        // every pickable kind now gets durable identity from a real
+        // tessellation-time table, not just faces. See #31, #33.
+        occtDep("OCCTSwiftTools", from: "1.6.0"),
     ],
     targets: [
         .target(

@@ -1,7 +1,7 @@
 ---
 title: Standard objects
 parent: Cookbook
-nav_order: 5
+nav_order: 6
 ---
 
 # Standard scene objects

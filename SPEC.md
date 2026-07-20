@@ -94,6 +94,20 @@ public final class InteractiveContext: ObservableObject {
     public func removeFilter(_ filter: any SelectionFilter)   // by reference identity
     public func removeAllFilters()
 
+    // MARK: - Area selection (#33)
+
+    /// CPU-projection-based (not GPU-pixel-based — see implementation
+    /// guidance below) rectangle/lasso selection. Honours `selectionMode` and
+    /// `filters` exactly as a point pick does.
+    public func selectRectangle(from: CGPoint, to: CGPoint,
+                                mode: AreaSelectionMode = .enclosed,
+                                scheme: SelectionScheme = .replace,
+                                viewportSize: CGSize)
+    public func selectPolygon(_ points: [CGPoint],
+                              mode: AreaSelectionMode = .enclosed,
+                              scheme: SelectionScheme = .replace,
+                              viewportSize: CGSize)
+
     // MARK: - Highlighting / styling
 
     public func setStyle(_ style: PresentationStyle, for object: InteractiveObject)
@@ -173,6 +187,28 @@ public final class AnyOfFilter: SelectionFilter { public init(_ filters: [any Se
 public final class NotFilter:   SelectionFilter { public init(_ filter: any SelectionFilter) }
 public final class PredicateFilter: SelectionFilter {
     public init(_ predicate: @escaping @Sendable (SubShape) -> Bool)
+}
+
+/// Rectangle/lasso area selection (#33) — CPU-projection based, see
+/// implementation guidance.
+public enum AreaSelectionMode: Sendable { case enclosed, intersecting }
+public enum SelectionScheme: Sendable   { case replace, add, remove, xor }
+
+/// SwiftUI drag-gesture integration, mirroring `ManipulatorWidget`'s
+/// `attachManipulator(_:)` pattern.
+public enum AreaSelectionTool: Sendable, Equatable { case navigate, rectangle, lasso }
+
+@MainActor
+public final class AreaSelectionController: ObservableObject {
+    public let context: InteractiveContext
+    public var tool: AreaSelectionTool     // default .navigate — drags pass through to camera orbit
+    public var mode: AreaSelectionMode
+    public var scheme: SelectionScheme
+    public init(context: InteractiveContext)
+}
+
+public extension View {
+    func attachAreaSelection(_ controller: AreaSelectionController) -> some View
 }
 ```
 
@@ -261,7 +297,7 @@ OCCTSwiftAIS's job:
 4. Resolve the ordinal to a `TopoDS_Face` handle via `OCCTSwiftTools.FaceIdentityTable.shape(forOrdinal:)` (captured at tessellation time) — **not** `OCCTSwift.Shape.subShapes(ofType: .face)[ordinal]`, which doesn't reliably agree with the render-path ordinal once a face is shared between shells (OCCTSwiftTools#42). Mint a `TopologyGraph.GraphUID` alongside via `FaceIdentityTable.uid(forOrdinal:)` when a graph is available.
 5. Wrap as a `SubShape.face(_, ref: SubShapeRef(shape:uid:ordinal:))` and feed into the selection state.
 
-For edges and vertices the pattern is similar but needs a separate buffer in `ViewportBody` — likely `edgeIndices` and `vertexIndices`. **Coordinate with OCCTSwiftViewport on adding those.** They probably belong in OCCTSwiftViewport (so the renderer knows about them) with `OCCTSwiftTools` populating them.
+Edges and vertices follow the identical pattern via `ViewportBody.edgeIndices` / `vertexIndices` (shipped since v0.3) and `OCCTSwiftTools.EdgeIdentityTable` / `VertexIdentityTable` (OCCTSwiftTools#43/#44, v1.6.0) — the same `shape(forOrdinal:)` / `uid(forOrdinal:)` shape as `FaceIdentityTable`, one table per pickable kind.
 
 ### Hover / highlight rendering
 
@@ -271,6 +307,20 @@ OCCTSwiftViewport doesn't currently support per-sub-shape styling — only per-b
 - **Right**: extend OCCTSwiftViewport with a per-triangle uniform-buffer style overlay and let OCCTSwiftAIS write into it. Needs a small renderer change but eliminates flicker.
 
 Start with the cheap route; upgrade if the visual quality is unacceptable.
+
+### Area selection (#33)
+
+**Deviation from the issue's suggested "first cut" — read before touching this code.** The issue proposed "GPU-based `.intersecting`, reading the pick texture over the region" as the easy first pass, with CPU-projected `.enclosed` as a follow-up. Investigating OCCTSwiftViewport's actual surface area found the opposite is true:
+
+- `ViewportRenderer.performPick(at:completion:)` reads exactly **one pixel** (a 1×1 blit) — there is no batch/region pick API, and the pick texture itself is `.private` (GPU-only, not CPU-readable). A GPU-pixel-scan implementation would need a new OCCTSwiftViewport-side API (e.g. a batched region-readback entry point) — a real cross-repo coordination, not something addable from this side alone.
+- `ProjectionUtility.worldToScreen(point:vpMatrix:viewportSize:)` (the inverse of `worldToNDC`, already used by `MeasurementOverlay` internally) is public today and sufficient for a CPU-side, vertex-projection-based implementation of *both* modes, with no OCCTSwiftViewport changes at all.
+
+What shipped: for every candidate sub-shape (enumerated via `FaceIdentityTable` / `EdgeIdentityTable` / `VertexIdentityTable` / the body's own bounding-box corners), project its vertices to screen space and test against the rectangle/polygon. `.enclosed` requires every projected vertex inside; `.intersecting` requires at least one. Two consequences worth knowing, both documented in code:
+
+- **No occlusion handling** — a sub-shape hidden behind another can still be picked up if its vertices project into the region.
+- **Vertex-only approximation** — a region entirely inside a large face's interior, touching none of its vertices, won't register as intersecting; curved edges are approximated by their endpoints.
+
+Gesture disambiguation (rectangle/lasso drag vs. camera orbit) follows the exact pattern `ManipulatorGestureCoordinator` already established for gizmo dragging: a `.highPriorityGesture(DragGesture)` wrapper that, when not actively marqueeing (`AreaSelectionTool.navigate`), manually forwards to `ViewportController.handleOrbit(translation:)` / `endOrbit(velocity:)` — there is no viewport-side "suppress camera" flag to flip instead. The rubber-band/lasso overlay is a plain SwiftUI `Shape` composited via `.overlay(...)` *outside* `MetalViewportView` (it has no content-injection point of its own), the same way `attachManipulator(_:)` stacks its gesture layer.
 
 ### Manipulator widget
 
@@ -358,7 +408,7 @@ After v0.5 the surface is essentially complete; v0.6 onward is polish + power fe
 
 This repo necessarily drives small changes in two siblings:
 
-- **OCCTSwiftViewport** — needs (a) per-sub-shape highlight overlay (v0.1 cheap route, then renderer-backed in v0.6), (b) `edgeIndices` and `vertexIndices` buffer fields on `ViewportBody` (v0.3), (c) widget overlay pass that bypasses normal pick (v0.2). Open issues against that repo as v0.1 lands.
+- **OCCTSwiftViewport** — needs (a) per-sub-shape highlight overlay (v0.1 cheap route, then renderer-backed in v0.6), (b) `edgeIndices` and `vertexIndices` buffer fields on `ViewportBody` (v0.3), (c) widget overlay pass that bypasses normal pick (v0.2). Open issues against that repo as v0.1 lands. (d) A batched/region pick-texture readback API — filed as [OCCTSwiftViewport#90](https://github.com/SecondMouseAU/OCCTSwiftViewport/issues/90); area selection ships CPU-projection based in the meantime (no occlusion handling), see "Area selection (#33)" above.
 - **OCCTSwiftTools** — needs to populate `edgeIndices` / `vertexIndices` buffers when extracting from `Shape` (v0.3). And pass-through metadata for dimension targeting (v0.4).
 - **OCCTSwift** — `BRepGraph_HistoryRecord` lookup helpers for the v0.6 selection-remap. Already largely in place from v0.157 onwards.
 

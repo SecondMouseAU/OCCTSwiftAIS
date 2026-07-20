@@ -154,7 +154,7 @@ struct SelectionFilterTests {
 
         let body = try #require(ctx.sourceBody(for: obj))
         // Find a triangle whose face ordinal is a planar cap.
-        let identity = try #require(ctx.identityTable(for: obj))
+        let identity = try #require(ctx.faceIdentityTable(for: obj))
         guard let planarOrdinal = (0..<identity.shapes.count).first(where: { ord in
             guard let shape = identity.shape(forOrdinal: ord), let face = Face(shape) else { return false }
             return face.surfaceType == .plane
@@ -177,7 +177,7 @@ struct SelectionFilterTests {
         ctx.addFilter(SurfaceTypeFilter([.cylinder]))
 
         let body = try #require(ctx.sourceBody(for: obj))
-        let identity = try #require(ctx.identityTable(for: obj))
+        let identity = try #require(ctx.faceIdentityTable(for: obj))
         guard let cylOrdinal = (0..<identity.shapes.count).first(where: { ord in
             guard let shape = identity.shape(forOrdinal: ord), let face = Face(shape) else { return false }
             return face.surfaceType == .cylinder
