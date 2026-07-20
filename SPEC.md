@@ -85,6 +85,15 @@ public final class InteractiveContext: ObservableObject {
     /// Hover state. Updated by the viewport controller when the cursor moves.
     public private(set) var hover: SubShape?
 
+    // MARK: - Selection filters (#32)
+
+    /// Filters gating `handlePick` / `handleHover` — never `select(_:)`. Combine
+    /// with AND (a deliberate departure from OCCT's context-level OR).
+    public private(set) var filters: [any SelectionFilter]
+    public func addFilter(_ filter: any SelectionFilter)
+    public func removeFilter(_ filter: any SelectionFilter)   // by reference identity
+    public func removeAllFilters()
+
     // MARK: - Highlighting / styling
 
     public func setStyle(_ style: PresentationStyle, for object: InteractiveObject)
@@ -141,6 +150,29 @@ public struct HighlightStyle: Sendable, Equatable {
     public var selectionColor: SIMD3<Float>
     public var hoverColor: SIMD3<Float>
     public var outlineWidth: Float
+}
+
+/// Restricts what's pickable/hoverable beyond `selectionMode` (#32). A class
+/// (not a struct) so `InteractiveContext.removeFilter(_:)` can identify a
+/// specific installed instance by reference — same reason as `Dimension`.
+public protocol SelectionFilter: AnyObject, Sendable {
+    func accepts(_ candidate: SubShape) -> Bool
+}
+
+public final class SurfaceTypeFilter: SelectionFilter {
+    public init(_ kinds: Set<Face.SurfaceType>)   // .plane, .cylinder, .cone, .sphere, .torus, …
+}
+public final class CurveTypeFilter: SelectionFilter {
+    public init(_ kinds: Set<Edge.CurveType>)     // .line, .circle, .ellipse, …
+}
+public final class ShapeTypeFilter: SelectionFilter {
+    public init(_ modes: Set<SelectionMode>)
+}
+public final class AllOfFilter: SelectionFilter { public init(_ filters: [any SelectionFilter]) }
+public final class AnyOfFilter: SelectionFilter { public init(_ filters: [any SelectionFilter]) }
+public final class NotFilter:   SelectionFilter { public init(_ filter: any SelectionFilter) }
+public final class PredicateFilter: SelectionFilter {
+    public init(_ predicate: @escaping @Sendable (SubShape) -> Bool)
 }
 ```
 

@@ -21,7 +21,7 @@ Bind it via `MetalViewportView(controller: ctx.viewport, bodies: $ctx.bodies)` w
 
 ## Topics
 
-- [Published properties](#published-properties) · [display(_:style:)](#display_style) · [update(_:to:absorbing:operationName:)](#update_toabsorbingoperationname) · [remove(_:)](#remove_) · [removeAll()](#removeall) · [Selection mutation](#selection-mutation) · [setStyle(_:for:)](#setstyle_for) · [setHighlightStyle(_:)](#sethighlightstyle_) · [add(_:)](#add_) · [remove(_:)-dimension](#remove_-dimension) · [dimensions](#dimensions) · [refreshDimensionMeasurement(_:)](#refreshdimensionmeasurement_) · [remap(_:using:rebindingTo:)](#remap_usingrebindingto) · [isDeleted(_:in:)](#isdeleted_in)
+- [Published properties](#published-properties) · [display(_:style:)](#display_style) · [update(_:to:absorbing:operationName:)](#update_toabsorbingoperationname) · [remove(_:)](#remove_) · [removeAll()](#removeall) · [Selection mutation](#selection-mutation) · [Selection filters](#selection-filters) · [setStyle(_:for:)](#setstyle_for) · [setHighlightStyle(_:)](#sethighlightstyle_) · [add(_:)](#add_) · [remove(_:)-dimension](#remove_-dimension) · [dimensions](#dimensions) · [refreshDimensionMeasurement(_:)](#refreshdimensionmeasurement_) · [remap(_:using:rebindingTo:)](#remap_usingrebindingto) · [isDeleted(_:in:)](#isdeleted_in)
 
 ---
 
@@ -167,6 +167,30 @@ ais.clearSelection()
 
 In practice most selections come from a pick — `handlePick` mints the `SubShapeRef` (uid included)
 for you.
+
+---
+
+## Selection filters
+
+Restrict what `handlePick` / `handleHover` accept, beyond `selectionMode`. See
+[Selection Filters](SelectionFilters.md) for the filter types themselves.
+
+```swift
+@Published public private(set) var filters: [any SelectionFilter]
+
+public func addFilter(_ filter: any SelectionFilter)
+public func removeFilter(_ filter: any SelectionFilter)   // by reference identity
+public func removeAllFilters()
+```
+
+- Installed filters combine with **AND** (a deliberate departure from OCCT's OR — see
+  [Selection Filters](SelectionFilters.md) for the rationale). Never gates programmatic `select(_:)`.
+- **Example:**
+
+```swift
+ais.addFilter(SurfaceTypeFilter([.cylinder]))
+ais.removeAllFilters()
+```
 
 ---
 
