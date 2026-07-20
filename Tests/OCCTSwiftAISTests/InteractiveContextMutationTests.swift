@@ -28,7 +28,7 @@ struct InteractiveContextMutationTests {
         let faces = base.faces()
         let centroids = base.measure().faceCentroids
         let bottomIndex = try #require(centroids.enumerated().min { $0.element.z < $1.element.z }?.offset)
-        let identity0 = try #require(ctx.identityTable(for: obj))
+        let identity0 = try #require(ctx.faceIdentityTable(for: obj))
         let bottomShape = try #require(identity0.shape(forOrdinal: bottomIndex))
         let bottomUID = try #require(identity0.uid(forOrdinal: bottomIndex))
         ctx.select(.face(obj, ref: SubShapeRef(shape: bottomShape, uid: bottomUID, ordinal: bottomIndex)))
@@ -104,7 +104,7 @@ struct InteractiveContextMutationTests {
         let ctx = makeContext()
         ctx.selectionMode = [.face]
         let obj = ctx.display(compound)
-        let identity = try #require(ctx.identityTable(for: obj))
+        let identity = try #require(ctx.faceIdentityTable(for: obj))
         #expect(identity.shapes.count == 7)
 
         // Ordinal 0 (shellA's copy) and ordinal 3 (shellB's copy, right after

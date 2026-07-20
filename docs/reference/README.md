@@ -17,6 +17,8 @@ The package is `import OCCTSwiftAIS` and depends transitively on `OCCTSwift`, `O
 - [Selection Filters](SelectionFilters.md) — `SelectionFilter`, `SurfaceTypeFilter`,
   `CurveTypeFilter`, `ShapeTypeFilter`, and composition (`AllOfFilter` / `AnyOfFilter` / `NotFilter` /
   `PredicateFilter`).
+- [Area Selection](AreaSelection.md) — `selectRectangle(from:to:)` / `selectPolygon(_:)`,
+  `AreaSelectionMode`, `SelectionScheme`, `AreaSelectionController`, and `.attachAreaSelection(_:)`.
 - [InteractiveContext](InteractiveContext.md) — the per-scene state object: display, selection
   mutation, styling, dimensions, remap, and selection filters.
 - [Manipulators](Manipulators.md) — `ManipulatorWidget` (translate / rotate gizmo) and its SwiftUI

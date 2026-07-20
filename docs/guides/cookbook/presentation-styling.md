@@ -1,7 +1,7 @@
 ---
 title: Presentation styling
 parent: Cookbook
-nav_order: 6
+nav_order: 7
 ---
 
 # Presentation styling

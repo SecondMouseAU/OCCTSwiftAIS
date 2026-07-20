@@ -64,10 +64,11 @@ public final class InteractiveContext: ObservableObject {
         let object: InteractiveObject
         let bodyID: String
         let metadata: CADBodyMetadata?
-        /// Per-ordinal face → (Shape, GraphUID) correspondence captured at
-        /// tessellation time — faces only (OCCTSwiftTools#42); no edge/vertex
-        /// counterpart upstream yet, see #31.
-        let identity: FaceIdentityTable?
+        /// Per-ordinal (Shape, GraphUID) correspondence captured at tessellation
+        /// time, one table per pickable kind (OCCTSwiftTools#43/#44).
+        let faceIdentity: FaceIdentityTable?
+        let edgeIdentity: EdgeIdentityTable?
+        let vertexIdentity: VertexIdentityTable?
         /// Living per-object graph, built once at `display(_:style:)` and
         /// retained across `update(_:to:absorbing:operationName:)` calls so
         /// `GraphUID`s minted at pick time keep resolving — see Remap.swift.
@@ -122,7 +123,7 @@ public final class InteractiveContext: ObservableObject {
         let graph = TopologyGraph(shape: shape)
         graph?.isHistoryEnabled = true
 
-        let (body, metadata, identity) = CADFileLoader.shapeToBodyMetadataAndIdentity(
+        let (body, metadata, faceIdentity, edgeIdentity, vertexIdentity) = CADFileLoader.shapeToBodyMetadataAndIdentities(
             shape, id: bodyID, color: rgba, graph: graph
         )
 
@@ -132,7 +133,9 @@ public final class InteractiveContext: ObservableObject {
         }
 
         entriesByID[object.id] = Entry(
-            object: object, bodyID: bodyID, metadata: metadata, identity: identity, graph: graph, style: style
+            object: object, bodyID: bodyID, metadata: metadata,
+            faceIdentity: faceIdentity, edgeIdentity: edgeIdentity, vertexIdentity: vertexIdentity,
+            graph: graph, style: style
         )
         entriesByBodyID[bodyID] = object.id
         return object
@@ -176,7 +179,7 @@ public final class InteractiveContext: ObservableObject {
 
         let updated = InteractiveObject(id: object.id, shape: newShape)
         let rgba = SIMD4<Float>(entry.style.color, 1.0 - entry.style.transparency)
-        let (body, metadata, identity) = CADFileLoader.shapeToBodyMetadataAndIdentity(
+        let (body, metadata, faceIdentity, edgeIdentity, vertexIdentity) = CADFileLoader.shapeToBodyMetadataAndIdentities(
             newShape, id: entry.bodyID, color: rgba, graph: graph
         )
 
@@ -190,8 +193,9 @@ public final class InteractiveContext: ObservableObject {
         }
 
         entriesByID[object.id] = Entry(
-            object: updated, bodyID: entry.bodyID, metadata: metadata, identity: identity, graph: graph,
-            style: entry.style
+            object: updated, bodyID: entry.bodyID, metadata: metadata,
+            faceIdentity: faceIdentity, edgeIdentity: edgeIdentity, vertexIdentity: vertexIdentity,
+            graph: graph, style: entry.style
         )
 
         let ownSubshapes = selection.subshapes.filter { $0.object.id == object.id }
@@ -250,6 +254,14 @@ public final class InteractiveContext: ObservableObject {
         selection = Selection()
     }
 
+    /// Replace `selection` wholesale. Used by `AreaSelection.swift` after
+    /// combining a rectangle/lasso match set with the existing selection per
+    /// `SelectionScheme` — kept internal since `select`/`deselect`/
+    /// `clearSelection` are the intended public mutation surface.
+    func setSelection(_ newSelection: Selection) {
+        selection = newSelection
+    }
+
     // MARK: - Selection filters
 
     /// Add a selection filter. Installed filters gate `handlePick` and
@@ -302,7 +314,19 @@ public final class InteractiveContext: ObservableObject {
         updateSelectionVisuals()
     }
 
-    // MARK: - Internal accessors (used by ManipulatorWidget)
+    // MARK: - Internal accessors (used by ManipulatorWidget, AreaSelection)
+
+    /// Every currently-displayed object, in no particular order.
+    func displayedObjects() -> [InteractiveObject] {
+        entriesByID.values.map(\.object)
+    }
+
+    /// Whether `object` is displayed and its `PresentationStyle.visible` flag
+    /// is set. Area selection skips hidden objects — it shouldn't select what
+    /// isn't visible on screen.
+    func isVisible(_ object: InteractiveObject) -> Bool {
+        entriesByID[object.id]?.style.visible ?? false
+    }
 
     /// The body ID currently associated with `object`, or nil if not displayed.
     func bodyID(for object: InteractiveObject) -> String? {
@@ -316,13 +340,22 @@ public final class InteractiveContext: ObservableObject {
         return bodies.first { $0.id == id }
     }
 
-    /// The `FaceIdentityTable` captured for `object` at display/update time, or
-    /// nil if not displayed or no graph was available to mint uids. Used by
+    /// The identity tables captured for `object` at display/update time, or nil
+    /// if not displayed or no graph was available to mint uids. Used by
     /// `remap(_:using:rebindingTo:)` in Remap.swift to assign a correct
-    /// render-path ordinal to a remapped face (rather than falling back to the
-    /// graph's raw node index, which isn't a tessellation ordinal).
-    func identityTable(for object: InteractiveObject) -> FaceIdentityTable? {
-        entriesByID[object.id]?.identity
+    /// render-path ordinal to a remapped sub-shape (rather than falling back to
+    /// the graph's raw node index, which isn't a tessellation ordinal), and by
+    /// area selection to enumerate every candidate sub-shape's `Shape`.
+    func faceIdentityTable(for object: InteractiveObject) -> FaceIdentityTable? {
+        entriesByID[object.id]?.faceIdentity
+    }
+
+    func edgeIdentityTable(for object: InteractiveObject) -> EdgeIdentityTable? {
+        entriesByID[object.id]?.edgeIdentity
+    }
+
+    func vertexIdentityTable(for object: InteractiveObject) -> VertexIdentityTable? {
+        entriesByID[object.id]?.vertexIdentity
     }
 
     /// Append a body created by an internal subsystem (manipulator, dimension, …).
@@ -440,9 +473,9 @@ public final class InteractiveContext: ObservableObject {
             // re-deriving it from the object's own sub-shape enumeration,
             // which need not agree once a face is shared between shells.
             if faceIdx >= 0,
-               let faceShape = entry.identity?.shape(forOrdinal: faceIdx)
+               let faceShape = entry.faceIdentity?.shape(forOrdinal: faceIdx)
                     ?? entry.object.shape.subShape(type: .face, index: faceIdx) {
-                let uid = entry.identity?.uid(forOrdinal: faceIdx)
+                let uid = entry.faceIdentity?.uid(forOrdinal: faceIdx)
                 return .face(entry.object, ref: SubShapeRef(shape: faceShape, uid: uid, ordinal: faceIdx))
             }
         }
@@ -459,18 +492,10 @@ public final class InteractiveContext: ObservableObject {
               result.triangleIndex < body.edgeIndices.count else { return nil }
         let edgeIdx = Int(body.edgeIndices[result.triangleIndex])
         guard edgeIdx >= 0,
-              let edgeShape = entry.object.shape.subShape(type: .edge, index: edgeIdx) else { return nil }
-        // No EdgeIdentityTable upstream yet (OCCTSwiftTools only ships
-        // FaceIdentityTable — see #31 follow-up filed against OCCTSwiftTools),
-        // so we mint the uid ourselves from the same graph, resolving the
-        // Shape by ordinal first. This still carries the render-path-ordinal
-        // coincidence risk `SubShapeRef` warns about — best effort until an
-        // EdgeIdentityTable lands.
-        var edgeUID: TopologyGraph.GraphUID?
-        if let graph = entry.graph, let node = graph.findNode(for: edgeShape) {
-            edgeUID = graph.uid(ofNodeKind: Int(node.kind.rawValue), index: node.index)
-        }
-        return .edge(entry.object, ref: SubShapeRef(shape: edgeShape, uid: edgeUID, ordinal: edgeIdx))
+              let edgeShape = entry.edgeIdentity?.shape(forOrdinal: edgeIdx)
+                ?? entry.object.shape.subShape(type: .edge, index: edgeIdx) else { return nil }
+        let uid = entry.edgeIdentity?.uid(forOrdinal: edgeIdx)
+        return .edge(entry.object, ref: SubShapeRef(shape: edgeShape, uid: uid, ordinal: edgeIdx))
     }
 
     private func resolveVertexSubShape(from result: PickResult, entry: Entry) -> SubShape? {
@@ -480,12 +505,10 @@ public final class InteractiveContext: ObservableObject {
               result.triangleIndex < body.vertexIndices.count else { return nil }
         let vIdx = Int(body.vertexIndices[result.triangleIndex])
         guard vIdx >= 0,
-              let vertexShape = entry.object.shape.subShape(type: .vertex, index: vIdx) else { return nil }
-        var vertexUID: TopologyGraph.GraphUID?
-        if let graph = entry.graph, let node = graph.findNode(for: vertexShape) {
-            vertexUID = graph.uid(ofNodeKind: Int(node.kind.rawValue), index: node.index)
-        }
-        return .vertex(entry.object, ref: SubShapeRef(shape: vertexShape, uid: vertexUID, ordinal: vIdx))
+              let vertexShape = entry.vertexIdentity?.shape(forOrdinal: vIdx)
+                ?? entry.object.shape.subShape(type: .vertex, index: vIdx) else { return nil }
+        let uid = entry.vertexIdentity?.uid(forOrdinal: vIdx)
+        return .vertex(entry.object, ref: SubShapeRef(shape: vertexShape, uid: uid, ordinal: vIdx))
     }
 
 }

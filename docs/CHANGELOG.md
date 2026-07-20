@@ -7,6 +7,23 @@ nav_order: 5
 
 Most recent first. Breaking changes and deprecations documented here.
 
+## v1.3.0 — 2026-07-20
+
+Rectangle and lasso area selection. Closes [#33](https://github.com/SecondMouseAU/OCCTSwiftAIS/issues/33).
+
+**Added:**
+
+- `InteractiveContext.selectRectangle(from:to:mode:scheme:viewportSize:)` / `selectPolygon(_:mode:scheme:viewportSize:)` — honour `selectionMode` and installed `filters` exactly as a point pick does. `AreaSelectionMode`: `.enclosed` (every candidate vertex inside the region) / `.intersecting` (at least one). `SelectionScheme`: `.replace` / `.add` / `.remove` / `.xor`, mirroring OCCT's `AIS_SelectionScheme`.
+- `AreaSelectionController` + `.attachAreaSelection(_:)`, mirroring `ManipulatorWidget`/`attachManipulator(_:)`'s exact architecture: a `.highPriorityGesture(DragGesture)` wrapper, a live rubber-band (rectangle) / lasso outline drawn as a plain SwiftUI overlay, and an explicit `AreaSelectionTool` (`.navigate` / `.rectangle` / `.lasso`) — `.navigate` (the default) forwards drags straight through to `ViewportController.handleOrbit`/`endOrbit`, so attaching the modifier changes nothing until the app explicitly switches tools.
+
+**Implementation note — a departure from the issue's suggested "first cut":** the issue proposed GPU-based `.intersecting` (reading the pick texture over the drag region) as the easy first pass. Investigation found the opposite: OCCTSwiftViewport's `performPick(at:)` reads exactly one pixel, has no batch/region variant, and its pick texture is GPU-private — a pixel-scan approach isn't available without a new OCCTSwiftViewport API (filed as [OCCTSwiftViewport#90](https://github.com/SecondMouseAU/OCCTSwiftViewport/issues/90)). Shipped instead: CPU-side, vertex-projection based enclosure/intersection testing via the existing public `ProjectionUtility.worldToScreen(point:vpMatrix:viewportSize:)`. Two documented limitations follow from this: **no occlusion handling** (a hidden sub-shape can still be picked up if its vertices project into the region), and a **vertex-only approximation** (a region entirely inside a large face's interior, touching none of its vertices, won't register as intersecting; curved edges are approximated by their endpoints).
+
+**Also in this release** (prep work for the above, closing out a known limitation from v1.1.0): `OCCTSwiftTools` floor raised `1.5.0` → `1.6.0`, adopting `EdgeIdentityTable` / `VertexIdentityTable` (OCCTSwiftTools#43/#44) via the new `shapeToBodyMetadataAndIdentities(...)` entry point. Edge and vertex `SubShapeRef.uid`s are now minted from real tessellation-time identity tables — the same footing faces have had since v1.1.0 — rather than the ad-hoc `graph.findNode(for:)` workaround on the ordinal-resolved shape. `InteractiveContext.remap` picks up the same upgrade: edge/vertex successors now get a correct render-path ordinal from their own identity table instead of falling back to the graph's raw node index.
+
+**Docs:** new cookbook page (`docs/guides/cookbook/area-selection.md`) and reference page (`docs/reference/AreaSelection.md`); SPEC.md gained an "Area selection (#33)" implementation-guidance section documenting the GPU-vs-CPU deviation above.
+
+**Tests:** 193 across 17 suites, all green. 15 new (`AreaSelectionTests`) covering rectangle/lasso basics, `.enclosed` vs `.intersecting` distinguishability, `selectionMode` honouring, filter gating, all four `SelectionScheme` values, gesture-coordinator navigate/rectangle modes, and a many-faced-model responsiveness sanity check.
+
 ## v1.2.0 — 2026-07-20
 
 Topology-aware selection filters. Closes [#32](https://github.com/SecondMouseAU/OCCTSwiftAIS/issues/32).

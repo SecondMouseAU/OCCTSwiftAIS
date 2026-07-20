@@ -21,7 +21,7 @@ Bind it via `MetalViewportView(controller: ctx.viewport, bodies: $ctx.bodies)` w
 
 ## Topics
 
-- [Published properties](#published-properties) · [display(_:style:)](#display_style) · [update(_:to:absorbing:operationName:)](#update_toabsorbingoperationname) · [remove(_:)](#remove_) · [removeAll()](#removeall) · [Selection mutation](#selection-mutation) · [Selection filters](#selection-filters) · [setStyle(_:for:)](#setstyle_for) · [setHighlightStyle(_:)](#sethighlightstyle_) · [add(_:)](#add_) · [remove(_:)-dimension](#remove_-dimension) · [dimensions](#dimensions) · [refreshDimensionMeasurement(_:)](#refreshdimensionmeasurement_) · [remap(_:using:rebindingTo:)](#remap_usingrebindingto) · [isDeleted(_:in:)](#isdeleted_in)
+- [Published properties](#published-properties) · [display(_:style:)](#display_style) · [update(_:to:absorbing:operationName:)](#update_toabsorbingoperationname) · [remove(_:)](#remove_) · [removeAll()](#removeall) · [Selection mutation](#selection-mutation) · [Selection filters](#selection-filters) · [Area selection](#area-selection) · [setStyle(_:for:)](#setstyle_for) · [setHighlightStyle(_:)](#sethighlightstyle_) · [add(_:)](#add_) · [remove(_:)-dimension](#remove_-dimension) · [dimensions](#dimensions) · [refreshDimensionMeasurement(_:)](#refreshdimensionmeasurement_) · [remap(_:using:rebindingTo:)](#remap_usingrebindingto) · [isDeleted(_:in:)](#isdeleted_in)
 
 ---
 
@@ -190,6 +190,34 @@ public func removeAllFilters()
 ```swift
 ais.addFilter(SurfaceTypeFilter([.cylinder]))
 ais.removeAllFilters()
+```
+
+---
+
+## Area selection
+
+Rectangle and lasso selection over a screen-space region — honours `selectionMode` and installed
+`filters` exactly like a point pick. See [Area Selection](AreaSelection.md) for `AreaSelectionMode`,
+`SelectionScheme`, and the SwiftUI gesture integration (`AreaSelectionController`,
+`.attachAreaSelection(_:)`).
+
+```swift
+public func selectRectangle(from: CGPoint, to: CGPoint,
+                            mode: AreaSelectionMode = .enclosed,
+                            scheme: SelectionScheme = .replace,
+                            viewportSize: CGSize)
+
+public func selectPolygon(_ points: [CGPoint],
+                          mode: AreaSelectionMode = .enclosed,
+                          scheme: SelectionScheme = .replace,
+                          viewportSize: CGSize)
+```
+
+- **Example:**
+
+```swift
+ais.selectRectangle(from: CGPoint(x: 100, y: 100), to: CGPoint(x: 400, y: 300),
+                    viewportSize: CGSize(width: 800, height: 600))
 ```
 
 ---

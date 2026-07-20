@@ -173,7 +173,42 @@ ais.removeFilter(someFilter)   // by reference identity
 ais.removeAllFilters()         // back to unrestricted picking
 ```
 
-## 6. Manipulator widgets
+## 6. Area selection
+
+Select a whole region in one gesture instead of clicking one sub-shape at a time — honours
+`selectionMode` and `filters` exactly like a point pick.
+
+```swift
+ais.selectRectangle(
+    from: CGPoint(x: 100, y: 100), to: CGPoint(x: 400, y: 300),
+    mode: .enclosed, scheme: .replace,
+    viewportSize: CGSize(width: 800, height: 600)
+)
+```
+
+`.enclosed` requires every candidate's screen-projected vertices inside the region; `.intersecting`
+requires at least one. There's no GPU pixel-scan behind this (OCCTSwiftViewport has no batch/region
+pick API — see [OCCTSwiftViewport#90](https://github.com/SecondMouseAU/OCCTSwiftViewport/issues/90)),
+so it's vertex-projection based: no occlusion handling, and a region entirely inside a large face's
+interior won't register as intersecting.
+
+Wire up the drag gesture and a live rubber-band/lasso overlay with `.attachAreaSelection(_:)`:
+
+```swift
+@StateObject private var areaSelection = AreaSelectionController(context: ais)
+
+var body: some View {
+    MetalViewportView(controller: ais.viewport, bodies: $ais.bodies)
+        .attachAreaSelection(areaSelection)
+}
+```
+
+`areaSelection.tool` defaults to `.navigate` — the drag passes straight through to camera orbit, so
+attaching the modifier changes nothing until the app explicitly flips it to `.rectangle` or `.lasso`
+(an explicit "select tool" toggle, since there's no hit-test to arbitrate a drag's intent the way the
+manipulator widget has for gizmo handles).
+
+## 7. Manipulator widgets
 
 A `ManipulatorWidget` is a translate or rotate gizmo bound to one `InteractiveObject`. You install it
 into an `InteractiveContext`; uninstall removes it cleanly and restores any pre-install transform on
@@ -239,7 +274,7 @@ widget.updateDrag(ndc: ndc, camera: cam, aspect: aspect)
 widget.endDrag(commit: true)
 ```
 
-## 7. Dimensions
+## 8. Dimensions
 
 A `Dimension` is a labeled measurement anchored on sub-shapes. Three concrete types:
 
@@ -302,7 +337,7 @@ lookup on the source `Shape`:
 These are constant-time lookups. Curved-face area-weighted centroids and arc-length edge midpoints are
 future refinements.
 
-## 8. Standard scene objects
+## 9. Standard scene objects
 
 Visual aids that ride on the `.userGeometry` pick layer but aren't selectable:
 
@@ -329,7 +364,7 @@ ais.bodies.append(contentsOf: tri.makeBodies())
 ais.bodies.removeAll { tri.ownsBody(id: $0.id) }
 ```
 
-## 9. Selection survival across `Shape` mutation
+## 10. Selection survival across `Shape` mutation
 
 A `SubShape`'s `SubShapeRef.ordinal` only means "this render-path index" while the exact tessellation
 it came from is unchanged. What actually survives a mutation is `SubShapeRef.uid` — a

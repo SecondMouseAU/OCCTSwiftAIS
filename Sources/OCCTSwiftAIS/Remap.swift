@@ -28,10 +28,9 @@ extension InteractiveContext {
     /// `.body(_)` sub-shapes always rebind to `newObject` — the body-level
     /// concept is identity-stable across mutations by construction.
     ///
-    /// Face successors get their render-path `ordinal` from `newObject`'s
-    /// `FaceIdentityTable` (matched by uid) when `newObject` is displayed in
-    /// this context; otherwise (or for edge/vertex successors, which have no
-    /// identity table upstream yet — see #31) the ordinal falls back to the
+    /// Every successor gets its render-path `ordinal` from `newObject`'s
+    /// identity table for that kind (matched by uid) when `newObject` is
+    /// displayed in this context; otherwise the ordinal falls back to the
     /// graph's own node index, which is *not* a tessellation ordinal and
     /// should not be used to index a `ViewportBody`'s per-triangle buffers.
     public func remap(
@@ -39,7 +38,9 @@ extension InteractiveContext {
         using graph: TopologyGraph,
         rebindingTo newObject: InteractiveObject
     ) -> Selection {
-        let identity = identityTable(for: newObject)
+        let faceUIDs = faceIdentityTable(for: newObject)?.uids
+        let edgeUIDs = edgeIdentityTable(for: newObject)?.uids
+        let vertexUIDs = vertexIdentityTable(for: newObject)?.uids
         var result: Set<SubShape> = []
         for sub in selection.subshapes {
             switch sub {
@@ -47,17 +48,17 @@ extension InteractiveContext {
                 result.insert(.body(newObject))
 
             case .face(_, let ref):
-                for successor in remapRef(ref, kind: .face, graph: graph, identity: identity) {
+                for successor in remapRef(ref, kind: .face, graph: graph, uids: faceUIDs) {
                     result.insert(.face(newObject, ref: successor))
                 }
 
             case .edge(_, let ref):
-                for successor in remapRef(ref, kind: .edge, graph: graph, identity: identity) {
+                for successor in remapRef(ref, kind: .edge, graph: graph, uids: edgeUIDs) {
                     result.insert(.edge(newObject, ref: successor))
                 }
 
             case .vertex(_, let ref):
-                for successor in remapRef(ref, kind: .vertex, graph: graph, identity: identity) {
+                for successor in remapRef(ref, kind: .vertex, graph: graph, uids: vertexUIDs) {
                     result.insert(.vertex(newObject, ref: successor))
                 }
             }
@@ -91,7 +92,7 @@ extension InteractiveContext {
         _ ref: SubShapeRef,
         kind: TopologyGraph.NodeKind,
         graph: TopologyGraph,
-        identity: FaceIdentityTable?
+        uids: [TopologyGraph.GraphUID?]?
     ) -> [SubShapeRef] {
         guard let uid = ref.uid, let node = graph.node(forUID: uid) else { return [] }
         let original = TopologyGraph.NodeRef(kind: kind, index: node.index)
@@ -102,7 +103,7 @@ extension InteractiveContext {
             }
             let newUID = graph.uid(ofNodeKind: Int(successor.kind.rawValue), index: successor.index)
             var ordinal = successor.index
-            if let newUID, let matched = identity?.uids?.firstIndex(of: newUID) {
+            if let newUID, let matched = uids?.firstIndex(of: newUID) {
                 ordinal = matched
             }
             return SubShapeRef(shape: shape, uid: newUID, ordinal: ordinal)

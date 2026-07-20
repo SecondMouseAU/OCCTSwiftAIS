@@ -25,6 +25,8 @@ per task, each a short bit of prose followed by runnable Swift snippets using th
 - [Filtering selection](filtering-selection.md) — `SelectionFilter` and the built-in
   `SurfaceTypeFilter` / `CurveTypeFilter` / `ShapeTypeFilter`, composed with `AllOfFilter` /
   `AnyOfFilter` / `NotFilter` / `PredicateFilter`.
+- [Area selection](area-selection.md) — `selectRectangle(from:to:)` / `selectPolygon(_:)`,
+  `AreaSelectionMode`, `SelectionScheme`, and the SwiftUI `.attachAreaSelection(_:)` modifier.
 - [Transform manipulators](manipulators.md) — install a translate / rotate `ManipulatorWidget`, drive
   it manually, or wire the SwiftUI `.attachManipulator(_:)` modifier.
 - [Dimensions](dimensions.md) — `LinearDimension`, `AngularDimension`, `RadialDimension`, and the
