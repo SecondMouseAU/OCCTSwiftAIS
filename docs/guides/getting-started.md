@@ -109,9 +109,9 @@ The derived accessors:
 
 | Accessor | Returns | Source |
 | --- | --- | --- |
-| `selection.faces` | `[Face]` | `shape.subShape(type: .face, index:)` → `Face(_:)` |
-| `selection.edges` | `[Edge]` | `shape.subShape(type: .edge, index:)` → `Edge(_:)` |
-| `selection.vertices` | `[SIMD3<Double>]` | `shape.vertex(at:)` |
+| `selection.faces` | `[Face]` | each entry's `SubShapeRef.shape` → `Face(_:)` |
+| `selection.edges` | `[Edge]` | each entry's `SubShapeRef.shape` → `Edge(_:)` |
+| `selection.vertices` | `[SIMD3<Double>]` | each entry's `SubShapeRef.shape.vertices().first` |
 | `selection.bodies` | `Set<InteractiveObject>` | distinct objects across all entries |
 
 A click **replaces** the selection with the picked sub-shape. Empty-space clicks leave the selection
@@ -137,7 +137,43 @@ ais.setHighlightStyle(HighlightStyle(
 ))
 ```
 
-## 5. Manipulator widgets
+## 5. Selection filters
+
+`selectionMode` restricts what *kind* of sub-shape counts; `SelectionFilter` restricts *which*
+candidates of an allowed kind are pickable — mirroring OCCT's `StdSelect_FaceFilter` /
+`StdSelect_EdgeFilter` family. Installed filters gate `handlePick` and hover, never programmatic
+`select(_:)`.
+
+```swift
+ais.selectionMode = [.face]
+ais.addFilter(SurfaceTypeFilter([.cylinder]))   // only cylindrical faces are pickable now
+```
+
+Built-in filters: `SurfaceTypeFilter` (by `Face.SurfaceType`), `CurveTypeFilter` (by `Edge.CurveType`),
+`ShapeTypeFilter` (by `SelectionMode`), plus composition (`AllOfFilter`, `AnyOfFilter`, `NotFilter`) and
+a closure escape hatch (`PredicateFilter`):
+
+```swift
+// Cylindrical faces under a given radius.
+ais.addFilter(AllOfFilter([
+    SurfaceTypeFilter([.cylinder]),
+    PredicateFilter { sub in
+        guard case .face(_, let ref) = sub, let face = Face(ref.shape) else { return false }
+        return face.bounds.max.x - face.bounds.min.x < 20
+    },
+]))
+```
+
+Multiple installed filters (`ais.filters`) combine with **AND** — every filter must accept a candidate.
+This is a deliberate departure from OCCT, whose context-level `AddFilter` combines with OR; see
+`InteractiveContext.passesInstalledFilters` for the rationale. Reach for `AnyOfFilter` when you want OR.
+
+```swift
+ais.removeFilter(someFilter)   // by reference identity
+ais.removeAllFilters()         // back to unrestricted picking
+```
+
+## 6. Manipulator widgets
 
 A `ManipulatorWidget` is a translate or rotate gizmo bound to one `InteractiveObject`. You install it
 into an `InteractiveContext`; uninstall removes it cleanly and restores any pre-install transform on
@@ -203,7 +239,7 @@ widget.updateDrag(ndc: ndc, camera: cam, aspect: aspect)
 widget.endDrag(commit: true)
 ```
 
-## 6. Dimensions
+## 7. Dimensions
 
 A `Dimension` is a labeled measurement anchored on sub-shapes. Three concrete types:
 
@@ -266,7 +302,7 @@ lookup on the source `Shape`:
 These are constant-time lookups. Curved-face area-weighted centroids and arc-length edge midpoints are
 future refinements.
 
-## 7. Standard scene objects
+## 8. Standard scene objects
 
 Visual aids that ride on the `.userGeometry` pick layer but aren't selectable:
 
@@ -293,7 +329,7 @@ ais.bodies.append(contentsOf: tri.makeBodies())
 ais.bodies.removeAll { tri.ownsBody(id: $0.id) }
 ```
 
-## 8. Selection survival across `Shape` mutation
+## 9. Selection survival across `Shape` mutation
 
 A `SubShape`'s `SubShapeRef.ordinal` only means "this render-path index" while the exact tessellation
 it came from is unchanged. What actually survives a mutation is `SubShapeRef.uid` — a

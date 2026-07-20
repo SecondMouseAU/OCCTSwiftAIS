@@ -44,6 +44,11 @@ public final class InteractiveContext: ObservableObject {
     }
     @Published public private(set) var hover: SubShape? = nil
 
+    /// Filters gating `handlePick` / `handleHover` — never programmatic
+    /// `select(_:)`. See `SelectionFilter.swift` for the combination semantics
+    /// (AND across installed filters, a deliberate departure from OCCT's OR).
+    @Published public private(set) var filters: [any SelectionFilter] = []
+
     // MARK: - Style
 
     public var highlightStyle: HighlightStyle = .default
@@ -245,6 +250,40 @@ public final class InteractiveContext: ObservableObject {
         selection = Selection()
     }
 
+    // MARK: - Selection filters
+
+    /// Add a selection filter. Installed filters gate `handlePick` and
+    /// `handleHover` — never programmatic `select(_:)`. A candidate a filter
+    /// rejects is treated exactly like an empty-space pick: the current
+    /// selection is left unchanged, not cleared.
+    public func addFilter(_ filter: any SelectionFilter) {
+        filters.append(filter)
+    }
+
+    /// Remove a previously-installed filter, by reference identity.
+    public func removeFilter(_ filter: any SelectionFilter) {
+        filters.removeAll { $0 === filter }
+    }
+
+    /// Remove every installed filter, restoring unrestricted picking.
+    public func removeAllFilters() {
+        filters.removeAll()
+    }
+
+    /// Whether `candidate` passes every currently-installed filter.
+    ///
+    /// **Combination semantics — a deliberate departure from OCCT.** OCCT's
+    /// `AIS_InteractiveContext::AddFilter` combines multiple installed filters
+    /// with OR (a candidate is kept if *any* installed filter accepts it), which
+    /// reads as a surprising default for narrowing what's selectable — the
+    /// second filter you add can only ever *widen* what's pickable, never narrow
+    /// it further. Here, installed filters combine with **AND**: a candidate
+    /// must pass *every* installed filter. Express OR explicitly with
+    /// `AnyOfFilter` when you actually want it.
+    func passesInstalledFilters(_ candidate: SubShape) -> Bool {
+        filters.allSatisfy { $0.accepts(candidate) }
+    }
+
     // MARK: - Style
 
     public func setStyle(_ style: PresentationStyle, for object: InteractiveObject) {
@@ -361,7 +400,7 @@ public final class InteractiveContext: ObservableObject {
               let id = entriesByBodyID[result.bodyID],
               let entry = entriesByID[id] else { return }
 
-        if let sub = resolveSubShape(from: result, entry: entry) {
+        if let sub = resolveSubShape(from: result, entry: entry), passesInstalledFilters(sub) {
             selection = Selection([sub])
         }
     }
@@ -375,7 +414,8 @@ public final class InteractiveContext: ObservableObject {
         }
         // Renderer publishes hover at body granularity; face/edge hover requires
         // a per-triangle hover stream that doesn't exist yet.
-        hover = selectionMode.contains(.body) ? .body(entry.object) : nil
+        let candidate: SubShape? = selectionMode.contains(.body) ? .body(entry.object) : nil
+        hover = candidate.flatMap { passesInstalledFilters($0) ? $0 : nil }
     }
 
     private func resolveSubShape(from result: PickResult, entry: Entry) -> SubShape? {

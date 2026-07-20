@@ -7,6 +7,22 @@ nav_order: 5
 
 Most recent first. Breaking changes and deprecations documented here.
 
+## v1.2.0 — 2026-07-20
+
+Topology-aware selection filters. Closes [#32](https://github.com/SecondMouseAU/OCCTSwiftAIS/issues/32).
+
+**Added:**
+
+- `SelectionFilter` protocol (`AnyObject, Sendable` — a class, not a struct, so `removeFilter(_:)` can identify an installed instance by reference, same reason as `Dimension`) and built-ins: `SurfaceTypeFilter(_ kinds: Set<Face.SurfaceType>)`, `CurveTypeFilter(_ kinds: Set<Edge.CurveType>)`, `ShapeTypeFilter(_ modes: Set<SelectionMode>)`. Reuses OCCTSwift's own `Face.SurfaceType` / `Edge.CurveType` classification directly rather than introducing a parallel enum, since OCCTSwift already ships exactly the needed classification.
+- Composition: `AllOfFilter`, `AnyOfFilter`, `NotFilter`, and a `PredicateFilter` closure escape hatch.
+- `InteractiveContext.addFilter(_:)` / `removeFilter(_:)` / `removeAllFilters()` / `filters: [any SelectionFilter]` (`@Published`). Installed filters gate `handlePick` and `handleHover` — never programmatic `select(_:)`, which (like `selectionMode`) is an intentional override by app code. A candidate a filter rejects is treated exactly like an empty-space pick: the current selection is left unchanged, not cleared.
+- **Combination semantics — a deliberate departure from OCCT:** `AIS_InteractiveContext::AddFilter` combines multiple installed filters with OR; here, `filters` combine with **AND** (a candidate must pass every installed filter) — OR reads as a surprising default for narrowing what's selectable, since a second filter could then only ever widen what's pickable. Use `AnyOfFilter` explicitly for OR.
+- Filters compose with the widget pick-layer routing without any special-casing needed: widget picks route through `viewport.widgetPickResult`, never through `handlePick`, so an installed filter has no effect on `ManipulatorWidget` regardless of how restrictive it is.
+
+**Docs:** new cookbook page (`docs/guides/cookbook/filtering-selection.md`) and reference page (`docs/reference/SelectionFilters.md`); getting-started walkthrough gained a new "Selection filters" section (renumbering sections 5-8 to 6-9). Also fixed a stale `docs/guides/getting-started.md` accessor table left over from v1.1.0 (`Selection.faces`/`.edges`/`.vertices` resolve from `SubShapeRef.shape`, not an index lookup — the table hadn't been updated in that release).
+
+**Tests:** 16 new (`SelectionFilterTests`) covering surface/curve/shape-type filtering, all four composition types, pick/hover gating, AND-not-OR combination semantics, `removeFilter`/`removeAllFilters`, and widget pick-layer isolation. **178 across 16 suites**, all green.
+
 ## v1.1.0 — 2026-07-20
 
 Durable sub-shape identity, replacing the index-remap path with `TopologyGraph` absorbed history. Closes [#31](https://github.com/SecondMouseAU/OCCTSwiftAIS/issues/31).
