@@ -59,6 +59,14 @@ public final class InteractiveContext: ObservableObject {
         let object: InteractiveObject
         let bodyID: String
         let metadata: CADBodyMetadata?
+        /// Per-ordinal face → (Shape, GraphUID) correspondence captured at
+        /// tessellation time — faces only (OCCTSwiftTools#42); no edge/vertex
+        /// counterpart upstream yet, see #31.
+        let identity: FaceIdentityTable?
+        /// Living per-object graph, built once at `display(_:style:)` and
+        /// retained across `update(_:to:absorbing:operationName:)` calls so
+        /// `GraphUID`s minted at pick time keep resolving — see Remap.swift.
+        let graph: TopologyGraph?
         var style: PresentationStyle
     }
     private var entriesByID: [UUID: Entry] = [:]
@@ -93,14 +101,24 @@ public final class InteractiveContext: ObservableObject {
     // MARK: - Display
 
     /// Display a shape with topology-aware selection enabled.
+    ///
+    /// Builds a `TopologyGraph` from `shape` and retains it for the object's
+    /// lifetime — see `update(_:to:absorbing:operationName:)` for how it's used
+    /// to carry a selection across a later mutation. Graph construction can
+    /// fail on pathological shapes; when it does, the object still displays but
+    /// picks against it mint `SubShapeRef`s with `uid == nil` (ordinal-only —
+    /// `remap` then has nothing durable to resolve them by).
     @discardableResult
     public func display(_ shape: Shape, style: PresentationStyle = .default) -> InteractiveObject {
         let object = InteractiveObject(shape: shape)
         let bodyID = "ais.\(object.id.uuidString)"
         let rgba = SIMD4<Float>(style.color, 1.0 - style.transparency)
 
-        let (body, metadata) = CADFileLoader.shapeToBodyAndMetadata(
-            shape, id: bodyID, color: rgba
+        let graph = TopologyGraph(shape: shape)
+        graph?.isHistoryEnabled = true
+
+        let (body, metadata, identity) = CADFileLoader.shapeToBodyMetadataAndIdentity(
+            shape, id: bodyID, color: rgba, graph: graph
         )
 
         if var body {
@@ -109,10 +127,79 @@ public final class InteractiveContext: ObservableObject {
         }
 
         entriesByID[object.id] = Entry(
-            object: object, bodyID: bodyID, metadata: metadata, style: style
+            object: object, bodyID: bodyID, metadata: metadata, identity: identity, graph: graph, style: style
         )
         entriesByBodyID[bodyID] = object.id
         return object
+    }
+
+    /// Update a displayed object after a modelling operation that rebuilds its
+    /// shape — a boolean, a fillet, a chamfer, anything produced via one of
+    /// OCCTSwift's `*WithFullHistory` methods run against `object.shape`.
+    ///
+    /// Absorbs the operation's history into the object's living `TopologyGraph`
+    /// (built once in `display(_:style:)`, retained here across calls — the
+    /// input and result share one graph instance, so every `GraphUID` already
+    /// held stays resolvable; see `TopologyGraph.add(_:absorbing:inputRoots:operationName:)`),
+    /// rebuilds the displayed mesh for `newShape`, and remaps any current
+    /// `selection` / `hover` sub-shapes referencing `object` forward via
+    /// `remap(_:using:rebindingTo:)`.
+    ///
+    /// `object.id` is unchanged; the returned `InteractiveObject` carries
+    /// `newShape`. Returns `nil` if `object` isn't displayed, has no living
+    /// graph (construction failed at `display` time), or the absorb fails —
+    /// in any of those cases the caller should `remove` and `display` fresh,
+    /// accepting that the selection doesn't survive.
+    ///
+    /// Sub-shapes whose node was deleted by the operation are dropped from the
+    /// selection silently; call `isDeleted(_:in:)` beforehand (using the same
+    /// `graph`, obtainable from this same call's absorb) to distinguish that
+    /// from "wasn't selected".
+    @discardableResult
+    public func update(
+        _ object: InteractiveObject,
+        to newShape: Shape,
+        absorbing history: ShapeHistoryRef,
+        operationName: String
+    ) -> InteractiveObject? {
+        guard let entry = entriesByID[object.id], let graph = entry.graph else { return nil }
+        guard let inputRoot = graph.findNode(for: entry.object.shape) else { return nil }
+        let rootRef = TopologyGraph.NodeRef(kind: inputRoot.kind, index: inputRoot.index)
+        guard graph.add(newShape, absorbing: history, inputRoots: [rootRef], operationName: operationName) != nil else {
+            return nil
+        }
+
+        let updated = InteractiveObject(id: object.id, shape: newShape)
+        let rgba = SIMD4<Float>(entry.style.color, 1.0 - entry.style.transparency)
+        let (body, metadata, identity) = CADFileLoader.shapeToBodyMetadataAndIdentity(
+            newShape, id: entry.bodyID, color: rgba, graph: graph
+        )
+
+        if let i = bodies.firstIndex(where: { $0.id == entry.bodyID }) {
+            if var body {
+                body.isVisible = entry.style.visible
+                bodies[i] = body
+            } else {
+                bodies.remove(at: i)
+            }
+        }
+
+        entriesByID[object.id] = Entry(
+            object: updated, bodyID: entry.bodyID, metadata: metadata, identity: identity, graph: graph,
+            style: entry.style
+        )
+
+        let ownSubshapes = selection.subshapes.filter { $0.object.id == object.id }
+        let otherSubshapes = selection.subshapes.subtracting(ownSubshapes)
+        let remapped = remap(Selection(ownSubshapes), using: graph, rebindingTo: updated)
+        selection = Selection(otherSubshapes.union(remapped.subshapes))
+
+        if let h = hover, h.object.id == object.id {
+            let remappedHover = remap(Selection([h]), using: graph, rebindingTo: updated)
+            hover = remappedHover.subshapes.first
+        }
+
+        return updated
     }
 
     public func remove(_ object: InteractiveObject) {
@@ -190,6 +277,15 @@ public final class InteractiveContext: ObservableObject {
         return bodies.first { $0.id == id }
     }
 
+    /// The `FaceIdentityTable` captured for `object` at display/update time, or
+    /// nil if not displayed or no graph was available to mint uids. Used by
+    /// `remap(_:using:rebindingTo:)` in Remap.swift to assign a correct
+    /// render-path ordinal to a remapped face (rather than falling back to the
+    /// graph's raw node index, which isn't a tessellation ordinal).
+    func identityTable(for object: InteractiveObject) -> FaceIdentityTable? {
+        entriesByID[object.id]?.identity
+    }
+
     /// Append a body created by an internal subsystem (manipulator, dimension, …).
     /// The body is **not** registered as a selectable `InteractiveObject` and is
     /// invisible to selection / hover wiring.
@@ -216,10 +312,12 @@ public final class InteractiveContext: ObservableObject {
         )
         viewport.selectedBodyIDs = selectedBodyIDs
 
+        // Per-triangle highlight indexes by the render-path ordinal — that's
+        // the only part of SubShapeRef the mesh knows about.
         var facesByObjectID: [UUID: Set<Int>] = [:]
         for sub in selection.subshapes {
-            guard case .face(let obj, let idx) = sub else { continue }
-            facesByObjectID[obj.id, default: []].insert(idx)
+            guard case .face(let obj, let ref) = sub else { continue }
+            facesByObjectID[obj.id, default: []].insert(ref.ordinal)
         }
 
         let highlightRGBA = SIMD4<Float>(highlightStyle.selectionColor, 1.0)
@@ -297,8 +395,15 @@ public final class InteractiveContext: ObservableObject {
            result.triangleIndex >= 0,
            result.triangleIndex < metadata.faceIndices.count {
             let faceIdx = Int(metadata.faceIndices[result.triangleIndex])
-            if faceIdx >= 0 {
-                return .face(entry.object, faceIndex: faceIdx)
+            // Prefer the FaceIdentityTable's Shape (captured at tessellation
+            // time — always the exact face that ordinal came from) over
+            // re-deriving it from the object's own sub-shape enumeration,
+            // which need not agree once a face is shared between shells.
+            if faceIdx >= 0,
+               let faceShape = entry.identity?.shape(forOrdinal: faceIdx)
+                    ?? entry.object.shape.subShape(type: .face, index: faceIdx) {
+                let uid = entry.identity?.uid(forOrdinal: faceIdx)
+                return .face(entry.object, ref: SubShapeRef(shape: faceShape, uid: uid, ordinal: faceIdx))
             }
         }
         if selectionMode.contains(.body) {
@@ -313,8 +418,19 @@ public final class InteractiveContext: ObservableObject {
         guard result.triangleIndex >= 0,
               result.triangleIndex < body.edgeIndices.count else { return nil }
         let edgeIdx = Int(body.edgeIndices[result.triangleIndex])
-        guard edgeIdx >= 0 else { return nil }
-        return .edge(entry.object, edgeIndex: edgeIdx)
+        guard edgeIdx >= 0,
+              let edgeShape = entry.object.shape.subShape(type: .edge, index: edgeIdx) else { return nil }
+        // No EdgeIdentityTable upstream yet (OCCTSwiftTools only ships
+        // FaceIdentityTable — see #31 follow-up filed against OCCTSwiftTools),
+        // so we mint the uid ourselves from the same graph, resolving the
+        // Shape by ordinal first. This still carries the render-path-ordinal
+        // coincidence risk `SubShapeRef` warns about — best effort until an
+        // EdgeIdentityTable lands.
+        var edgeUID: TopologyGraph.GraphUID?
+        if let graph = entry.graph, let node = graph.findNode(for: edgeShape) {
+            edgeUID = graph.uid(ofNodeKind: Int(node.kind.rawValue), index: node.index)
+        }
+        return .edge(entry.object, ref: SubShapeRef(shape: edgeShape, uid: edgeUID, ordinal: edgeIdx))
     }
 
     private func resolveVertexSubShape(from result: PickResult, entry: Entry) -> SubShape? {
@@ -323,8 +439,13 @@ public final class InteractiveContext: ObservableObject {
         guard result.triangleIndex >= 0,
               result.triangleIndex < body.vertexIndices.count else { return nil }
         let vIdx = Int(body.vertexIndices[result.triangleIndex])
-        guard vIdx >= 0 else { return nil }
-        return .vertex(entry.object, vertexIndex: vIdx)
+        guard vIdx >= 0,
+              let vertexShape = entry.object.shape.subShape(type: .vertex, index: vIdx) else { return nil }
+        var vertexUID: TopologyGraph.GraphUID?
+        if let graph = entry.graph, let node = graph.findNode(for: vertexShape) {
+            vertexUID = graph.uid(ofNodeKind: Int(node.kind.rawValue), index: node.index)
+        }
+        return .vertex(entry.object, ref: SubShapeRef(shape: vertexShape, uid: vertexUID, ordinal: vIdx))
     }
 
 }

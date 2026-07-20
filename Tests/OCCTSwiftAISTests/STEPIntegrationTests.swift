@@ -116,7 +116,7 @@ struct STEPStockIntegrationTests {
 
         ctx.handlePick(pick)
 
-        #expect(ctx.selection.subshapes.contains(.face(obj, faceIndex: expectedFace)))
+        #expect(containsFace(ctx.selection.subshapes, obj, ordinal: expectedFace))
         #expect(ctx.selection.faces.count == 1)
     }
 
@@ -138,7 +138,7 @@ struct STEPStockIntegrationTests {
 
         ctx.handlePick(pick)
 
-        #expect(ctx.selection.subshapes.contains(.vertex(obj, vertexIndex: expectedVertex)))
+        #expect(containsVertex(ctx.selection.subshapes, obj, ordinal: expectedVertex))
         #expect(ctx.selection.vertices.count == 1)
         let resolved = try #require(ctx.selection.vertices.first)
         let direct = try #require(shape.vertex(at: expectedVertex))
@@ -176,8 +176,8 @@ struct STEPStockIntegrationTests {
         // Build a dimension across the first parallel pair found.
         let firstPair = try #require(findOppositeFacePair(in: shape))
         let dim = LinearDimension(
-            from: .face(obj, faceIndex: firstPair.0),
-            to:   .face(obj, faceIndex: firstPair.1)
+            from: .face(obj, ref: try faceRef(obj, firstPair.0)),
+            to:   .face(obj, ref: try faceRef(obj, firstPair.1))
         )
         ctx.add(dim)
         // Distance must approximate one of the box's three extents.
@@ -211,22 +211,34 @@ struct STEPStockIntegrationTests {
 
     // MARK: - Selection mutation cycle (sanity check)
 
-    @Test func t_displayRemoveDisplay_keepsRemapWorkingAcrossSameTopology() async throws {
+    @Test func t_update_survivesMutationThatNeverTouchesTheSelectedFace() async throws {
         let (_, shape) = try await loadStock(Self.stockFixtures[0])
         let ctx = InteractiveContext(viewport: ViewportController())
-        let oldObj = ctx.display(shape)
-        ctx.select(.face(oldObj, faceIndex: 0))
-        let oldSelection = ctx.selection
+        ctx.selectionMode = [.face]
+        let obj = ctx.display(shape)
+        let body = try #require(ctx.sourceBody(for: obj))
+        try #require(!body.faceIndices.isEmpty)
 
-        // Re-display the same shape (no mutation, just renaming the object).
-        ctx.removeAll()
-        let newObj = ctx.display(shape)
-        let graph = try #require(TopologyGraph(shape: shape, parallel: false))
-        graph.isHistoryEnabled = true
-        // No history recorded → keepUnchanged preserves the index.
-        let remapped = ctx.remap(oldSelection, using: graph, rebindingTo: newObj, strategy: .keepUnchanged)
-        let expected: Set<SubShape> = [.face(newObj, faceIndex: 0)]
-        #expect(remapped.subshapes == expected)
+        let primIdx = 0
+        let expectedFace = Int(body.faceIndices[primIdx])
+        let raw = UInt32(primIdx & 0x3FFF) << 16 | (UInt32(PrimitiveKind.face.rawValue) << 30)
+        let pick = try #require(PickResult(rawValue: raw, indexMap: [0: body.id]))
+        ctx.handlePick(pick)
+        #expect(containsFace(ctx.selection.subshapes, obj, ordinal: expectedFace))
+
+        // A tool positioned well outside the stock's bounds — the boolean
+        // subtract is a geometric no-op, so the selected face's node has no
+        // history record and survives via `findDerivedOrSelf`'s untouched case.
+        let (lo, hi) = shape.bounds
+        let farAway = try #require(OCCTSwift.Shape.box(
+            origin: SIMD3<Double>(hi.x + 1000, hi.y + 1000, hi.z + 1000),
+            width: 1, height: 1, depth: 1
+        ))
+        let (result, history) = try #require(shape.subtractedWithFullHistory(farAway))
+
+        let updated = try #require(ctx.update(obj, to: result, absorbing: history, operationName: "no-op-cut"))
+        #expect(!ctx.selection.isEmpty, "a face never touched by the mutation should survive the update")
+        #expect(ctx.selection.subshapes.allSatisfy { $0.object == updated })
     }
 }
 
@@ -295,7 +307,7 @@ struct STEPWIPIntegrationTests {
 
         let ctx = InteractiveContext(viewport: ViewportController())
         let obj = ctx.display(shape)
-        let rad = RadialDimension(circularEdge: .edge(obj, edgeIndex: circIdx))
+        let rad = RadialDimension(circularEdge: .edge(obj, ref: try edgeRef(obj, circIdx)))
         ctx.add(rad)
 
         // Radius is finite and positive — the round-trip through
@@ -343,6 +355,6 @@ struct STEPWIPIntegrationTests {
         ctx.selectionMode = [.face]
         ctx.handlePick(pick)
         #expect(ctx.selection.faces.count == 1)
-        #expect(ctx.selection.subshapes.contains(.face(obj, faceIndex: expectedFace)))
+        #expect(containsFace(ctx.selection.subshapes, obj, ordinal: expectedFace))
     }
 }

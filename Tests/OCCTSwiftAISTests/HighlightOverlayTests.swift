@@ -29,7 +29,7 @@ struct HighlightOverlayTests {
         ctx.selectionMode = [.face]
         let obj = ctx.display(try makeBox())
 
-        ctx.select(.face(obj, faceIndex: 0))
+        ctx.select(.face(obj, ref: SubShapeRef(shape: obj.shape, ordinal: 0)))
 
         let body = try #require(sourceBody(ctx, target: obj))
         let triangleCount = body.indices.count / 3
@@ -51,7 +51,7 @@ struct HighlightOverlayTests {
         let ctx = makeContext()
         ctx.selectionMode = [.face]
         let obj = ctx.display(try makeBox())
-        ctx.select(.face(obj, faceIndex: 0))
+        ctx.select(.face(obj, ref: SubShapeRef(shape: obj.shape, ordinal: 0)))
         #expect(ctx.bodies.count == 1)
         #expect(ctx.bodies.contains { $0.id.hasPrefix("ais.overlay.") } == false)
     }
@@ -65,7 +65,7 @@ struct HighlightOverlayTests {
             hoverColor: .zero,
             outlineWidth: 1
         ))
-        ctx.select(.face(obj, faceIndex: 0))
+        ctx.select(.face(obj, ref: SubShapeRef(shape: obj.shape, ordinal: 0)))
 
         let body = try #require(sourceBody(ctx, target: obj))
         let firstHighlight = body.triangleStyles.first { $0.color.w > 0 }
@@ -80,7 +80,7 @@ struct HighlightOverlayTests {
         let ctx = makeContext()
         ctx.selectionMode = [.face]
         let obj = ctx.display(try makeBox())
-        ctx.select(.face(obj, faceIndex: 0))
+        ctx.select(.face(obj, ref: SubShapeRef(shape: obj.shape, ordinal: 0)))
         ctx.setHighlightStyle(HighlightStyle(
             selectionColor: SIMD3<Float>(0, 1, 0),
             hoverColor: .zero,
@@ -97,7 +97,7 @@ struct HighlightOverlayTests {
         let ctx = makeContext()
         ctx.selectionMode = [.face]
         let obj = ctx.display(try makeBox())
-        ctx.select(.face(obj, faceIndex: 0))
+        ctx.select(.face(obj, ref: SubShapeRef(shape: obj.shape, ordinal: 0)))
         let preBody = try #require(sourceBody(ctx, target: obj))
         #expect(!preBody.triangleStyles.isEmpty)
         ctx.clearSelection()
@@ -109,8 +109,8 @@ struct HighlightOverlayTests {
         let ctx = makeContext()
         ctx.selectionMode = [.face]
         let obj = ctx.display(try makeBox())
-        ctx.select(.face(obj, faceIndex: 0))
-        ctx.select(.face(obj, faceIndex: 1))
+        ctx.select(.face(obj, ref: SubShapeRef(shape: obj.shape, ordinal: 0)))
+        ctx.select(.face(obj, ref: SubShapeRef(shape: obj.shape, ordinal: 1)))
 
         let body = try #require(sourceBody(ctx, target: obj))
         let highlightedFaces = Set(
@@ -127,8 +127,8 @@ struct HighlightOverlayTests {
         ctx.selectionMode = [.face]
         let a = ctx.display(try makeBox())
         let b = ctx.display(try makeBox())
-        ctx.select(.face(a, faceIndex: 0))
-        ctx.select(.face(b, faceIndex: 0))
+        ctx.select(.face(a, ref: SubShapeRef(shape: a.shape, ordinal: 0)))
+        ctx.select(.face(b, ref: SubShapeRef(shape: b.shape, ordinal: 0)))
 
         let bodyA = try #require(sourceBody(ctx, target: a))
         let bodyB = try #require(sourceBody(ctx, target: b))
@@ -142,7 +142,7 @@ struct HighlightOverlayTests {
         let ctx = makeContext()
         ctx.selectionMode = [.face]
         let obj = ctx.display(try makeBox())
-        ctx.select(.face(obj, faceIndex: 0))
+        ctx.select(.face(obj, ref: SubShapeRef(shape: obj.shape, ordinal: 0)))
         ctx.remove(obj)
         #expect(ctx.bodies.isEmpty)
         #expect(ctx.selection.isEmpty)
@@ -155,7 +155,7 @@ struct HighlightOverlayTests {
         let ctx = makeContext()
         ctx.selectionMode = [.face]
         let a = ctx.display(try makeBox())
-        ctx.select(.face(a, faceIndex: 0))
+        ctx.select(.face(a, ref: SubShapeRef(shape: a.shape, ordinal: 0)))
         _ = ctx.display(try makeBox())
         #expect(ctx.bodies.count == 2)
         #expect(ctx.bodies.contains { $0.id.hasPrefix("ais.overlay.") } == false)

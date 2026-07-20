@@ -35,13 +35,13 @@ let package = Package(
         ),
     ],
     dependencies: [
-        // Brings in OCCTSwift and OCCTSwiftViewport transitively. Tools 1.0.2
-        // graduates onto the SemVer-stable Viewport 1.0.x line and pulls the
-        // v1.0.3 history APIs from OCCTSwift. Re-exports OCCTSwiftIO so
-        // existing `OCCTSwiftTools.X` references still resolve. Body picking
-        // metadata convention (vertices / vertexIndices / edgeIndices)
-        // preserved across the v1.0 cut — see OCCTSwiftTools#10.
-        occtDep("OCCTSwiftTools", from: "1.1.2"),
+        // Brings in OCCTSwift and OCCTSwiftViewport transitively. Tools 1.5.0
+        // re-pins the cohort onto current OCCTSwift (1.12.9+) and ships
+        // `shapeToBodyMetadataAndIdentity(...graph:)` + `FaceIdentityTable`
+        // (OCCTSwiftTools#42), which durable sub-shape identity in this repo
+        // (`SubShapeRef.uid`, `InteractiveContext.update`/`remap`) is built on
+        // — see #31.
+        occtDep("OCCTSwiftTools", from: "1.5.0"),
     ],
     targets: [
         .target(

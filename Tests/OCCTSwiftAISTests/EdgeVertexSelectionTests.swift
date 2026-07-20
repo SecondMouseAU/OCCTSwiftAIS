@@ -72,7 +72,7 @@ struct EdgeVertexSelectionTests {
         let pick = try makePick(bodyID: body.id, primitiveIndex: 0, kind: .face)
         ctx.handlePick(pick)
         let expectedFaceIdx = Int(body.faceIndices[0])
-        #expect(ctx.selection.subshapes.contains(.face(obj, faceIndex: expectedFaceIdx)))
+        #expect(containsFace(ctx.selection.subshapes, obj, ordinal: expectedFaceIdx))
     }
 
     @Test func t_handlePick_kindEdge_resolvesToEdgeSubShape() throws {
@@ -88,7 +88,7 @@ struct EdgeVertexSelectionTests {
         ctx.handlePick(pick)
 
         #expect(ctx.selection.count == 1)
-        #expect(ctx.selection.subshapes.contains(.edge(obj, edgeIndex: expectedEdgeIdx)))
+        #expect(containsEdge(ctx.selection.subshapes, obj, ordinal: expectedEdgeIdx))
     }
 
     @Test func t_handlePick_kindVertex_resolvesToVertexSubShape() throws {
@@ -104,7 +104,7 @@ struct EdgeVertexSelectionTests {
         ctx.handlePick(pick)
 
         #expect(ctx.selection.count == 1)
-        #expect(ctx.selection.subshapes.contains(.vertex(obj, vertexIndex: expectedVIdx)))
+        #expect(containsVertex(ctx.selection.subshapes, obj, ordinal: expectedVIdx))
     }
 
     @Test func t_handlePick_kindEdge_modeNotEdge_isIgnored() throws {
@@ -171,11 +171,13 @@ struct EdgeVertexSelectionTests {
     @Test func t_selectionVertices_filtersOnlyVertexCases() throws {
         let ctx = makeContext()
         let obj = ctx.display(try makeBox())
+        let vertex0 = try #require(obj.shape.subShape(type: .vertex, index: 0))
+        let vertex1 = try #require(obj.shape.subShape(type: .vertex, index: 1))
         let s = Selection([
             .body(obj),
-            .face(obj, faceIndex: 0),
-            .vertex(obj, vertexIndex: 0),
-            .vertex(obj, vertexIndex: 1),
+            .face(obj, ref: SubShapeRef(shape: obj.shape, ordinal: 0)),
+            .vertex(obj, ref: SubShapeRef(shape: vertex0, ordinal: 0)),
+            .vertex(obj, ref: SubShapeRef(shape: vertex1, ordinal: 1)),
         ])
         #expect(s.vertices.count == 2)
     }

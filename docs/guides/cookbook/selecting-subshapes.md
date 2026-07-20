@@ -48,9 +48,28 @@ for p in sel.vertices {            // [SIMD3<Double>]
 }
 ```
 
-`Selection.faces` / `.edges` resolve via `shape.subShape(type:index:)` then wrap in `Face` / `Edge`;
-entries whose index no longer resolves are silently omitted. `Selection.vertices` returns world-space
-`SIMD3<Double>` coordinates (OCCTSwift exposes vertices positionally, not as a `Vertex` class).
+`Selection.faces` / `.edges` resolve directly from each entry's `SubShapeRef.shape` (the concrete
+sub-shape captured at pick time) and wrap it in `Face` / `Edge` — no re-derivation via
+`shape.subShape(type:index:)` by index, which doesn't reliably agree with the render-path ordinal once
+a sub-shape is shared between shells. `Selection.vertices` returns world-space `SIMD3<Double>`
+coordinates (OCCTSwift exposes vertices positionally, not as a `Vertex` class).
+
+## `SubShape` and `SubShapeRef`
+
+`.face` / `.edge` / `.vertex` carry a `SubShapeRef`, not a bare index:
+
+```swift
+public struct SubShapeRef: Hashable, Sendable {
+    public let shape: Shape                       // the picked sub-shape itself
+    public let uid: TopologyGraph.GraphUID?        // durable handle, when a graph was in hand
+    public let ordinal: Int                        // tessellation-time render-path index
+}
+```
+
+- **`shape`** is what geometry queries should use (`Face(ref.shape)`, `sel.faces`, …).
+- **`uid`** is what survives a mutation — see "Remapping a selection" below.
+- **`ordinal`** is render-path-only (highlight overlays index per-triangle buffers by it); never
+  compare sub-shapes by ordinal alone.
 
 ## Programmatic, additive selection
 
@@ -59,35 +78,41 @@ idempotent. `clearSelection()` empties it.
 
 ```swift
 let obj = ais.display(Shape.box(width: 4, height: 4, depth: 4)!)
-ais.select(.face(obj, faceIndex: 0))
-ais.select(.face(obj, faceIndex: 2))   // now two faces selected
-ais.deselect(.face(obj, faceIndex: 0)) // back to one
+let faceShape0 = obj.shape.subShape(type: .face, index: 0)!
+let faceShape2 = obj.shape.subShape(type: .face, index: 2)!
+ais.select(.face(obj, ref: SubShapeRef(shape: faceShape0, ordinal: 0)))
+ais.select(.face(obj, ref: SubShapeRef(shape: faceShape2, ordinal: 2)))   // now two faces selected
+ais.deselect(.face(obj, ref: SubShapeRef(shape: faceShape0, ordinal: 0))) // back to one
 ais.clearSelection()
 ```
+
+In practice most selections come from a pick (`handlePick` mints the `SubShapeRef`, uid included,
+for you) rather than being hand-built like this.
 
 ## Remapping a selection across a `Shape` mutation
 
-A `SubShape.face(_, faceIndex: 5)` only means "face 5" while the underlying `Shape` is unchanged.
-After a boolean or fillet, indices renumber. `remap(_:using:rebindingTo:strategy:)` carries the
-selection forward using OCCTSwift history records on a `TopologyGraph`:
+A render-path ordinal only means "face 5" while the exact tessellation it came from is unchanged. To
+carry a selection across a modelling operation that rebuilds the shape (a boolean, a fillet), use
+`InteractiveContext.update(_:to:absorbing:operationName:)` — it absorbs the operation's history into
+the object's own living `TopologyGraph` (built once at `display(_:style:)` and retained across every
+subsequent `update` call) and remaps `selection` / `hover` forward automatically:
 
 ```swift
-let oldObj = ais.display(oldShape)
-ais.select(.face(oldObj, faceIndex: 0))
+let obj = ais.display(baseShape)
+ais.selectionMode = [.face]
+// ... a pick populates ais.selection with a SubShapeRef carrying a uid ...
 
-// Build a TopologyGraph from the post-mutation shape, with history recorded:
-let graph = TopologyGraph(shape: newShape, parallel: false)!
-graph.isHistoryEnabled = true
-
-ais.remove(oldObj)
-let newObj = ais.display(newShape)
-
-let remapped = ais.remap(ais.selection, using: graph,
-                         rebindingTo: newObj, strategy: .dropMissing)
-ais.clearSelection()
-for sub in remapped.subshapes { ais.select(sub) }
+let (result, history) = baseShape.subtractedWithFullHistory(tool)!
+if let updated = ais.update(obj, to: result, absorbing: history, operationName: "cut") {
+    // ais.selection now references `updated` — split faces expand to all their
+    // successors; a sub-shape the cut deleted is dropped, not silently pointed
+    // at a coincidentally-adjacent neighbour.
+}
 ```
 
-`.dropMissing` (the default) drops sub-shapes the history doesn't mention; `.keepUnchanged` keeps
-their original index — only safe when the operation didn't shift ordering. A `1 → N` split (an edge
-divided by a fillet) automatically expands into N entries; `.body(_)` always rebinds to `newObject`.
+`remap(_:using:rebindingTo:)` is the lower-level primitive `update` calls internally — resolve via
+each sub-shape's `uid` (`graph.node(forUID:)`, which rejects a uid minted by a different graph
+instance) and `graph.findDerivedOrSelf(of:)`. A sub-shape with no `uid` (no graph was in hand at pick
+time) is dropped: there's nothing durable to resolve it by. `.body(_)` always rebinds to the new
+object. `isDeleted(_:in:)` distinguishes "the operation consumed this sub-shape" from "it wasn't
+selected" — `remap` alone can't, since both just look like "absent from the result."
