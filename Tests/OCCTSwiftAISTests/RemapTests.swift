@@ -21,7 +21,7 @@ struct RemapTests {
         let ctx = makeContext()
         let oldObj = ctx.display(try makeBox())
         let newObj = ctx.display(try makeBox())
-        let graph = try #require(TopologyGraph(shape: newObj.shape))
+        let graph = try #require(BRepGraph(shape: newObj.shape))
 
         let old = Selection([.body(oldObj)])
         let remapped = ctx.remap(old, using: graph, rebindingTo: newObj)
@@ -40,7 +40,7 @@ struct RemapTests {
         let oldObj = ctx.display(try makeBox())
         let newShape = try makeBox()
         let newObj = ctx.display(newShape)
-        let graph = try #require(TopologyGraph(shape: newShape))
+        let graph = try #require(BRepGraph(shape: newShape))
 
         let old = Selection([.face(oldObj, ref: SubShapeRef(shape: oldObj.shape, ordinal: 0))])
         let remapped = ctx.remap(old, using: graph, rebindingTo: newObj)
@@ -50,19 +50,19 @@ struct RemapTests {
 
     @Test func t_remap_uidForeignToGraph_isDropped() throws {
         // A uid minted by a DIFFERENT graph instance is rejected by
-        // `node(forUID:)` (TopologyGraph's own foreign-uid guard, OCCTSwift#295)
+        // `node(forUID:)` (BRepGraph's own foreign-uid guard, OCCTSwift#295)
         // rather than resolving to a coincidentally-matching node.
         let ctx = makeContext()
         let oldShape = try makeBox()
-        let oldGraph = try #require(TopologyGraph(shape: oldShape))
+        let oldGraph = try #require(BRepGraph(shape: oldShape))
         let foreignUID = try #require(
-            oldGraph.uid(ofNodeKind: Int(TopologyGraph.NodeKind.face.rawValue), index: 0)
+            oldGraph.uid(ofNodeKind: Int(BRepGraph.NodeKind.face.rawValue), index: 0)
         )
         let oldObj = ctx.display(oldShape)
 
         let newShape = try makeBox()
         let newObj = ctx.display(newShape)
-        let graph = try #require(TopologyGraph(shape: newShape))  // a different instance
+        let graph = try #require(BRepGraph(shape: newShape))  // a different instance
 
         let old = Selection([.face(oldObj, ref: SubShapeRef(shape: oldShape, uid: foreignUID, ordinal: 0))])
         let remapped = ctx.remap(old, using: graph, rebindingTo: newObj)
@@ -74,7 +74,7 @@ struct RemapTests {
         let ctx = makeContext()
         let newShape = try makeBox()
         let newObj = ctx.display(newShape)
-        let graph = try #require(TopologyGraph(shape: newShape))
+        let graph = try #require(BRepGraph(shape: newShape))
         let remapped = ctx.remap(Selection(), using: graph, rebindingTo: newObj)
         #expect(remapped.isEmpty)
     }
@@ -83,9 +83,9 @@ struct RemapTests {
 
     @Test func t_remap_faceUntouchedByOperation_resolvesToItself() throws {
         let base = try #require(OCCTSwift.Shape.box(origin: SIMD3(0, 0, 0), width: 10, height: 10, depth: 10))
-        let graph = try #require(TopologyGraph(shape: base))
+        let graph = try #require(BRepGraph(shape: base))
         let rootNode = try #require(graph.findNode(for: base))
-        let root = TopologyGraph.NodeRef(kind: rootNode.kind, index: rootNode.index)
+        let root = BRepGraph.NodeRef(kind: rootNode.kind, index: rootNode.index)
 
         // Pin the bottom face (min-z centroid) — the channel cut below only
         // touches the top face, so the bottom face's node has no history
@@ -95,7 +95,7 @@ struct RemapTests {
         let bottomIndex = try #require(centroids.enumerated().min { $0.element.z < $1.element.z }?.offset)
         let bottomFace = try #require(Shape.fromFace(faces[bottomIndex]))
         let bottomNode = try #require(graph.findNode(for: bottomFace))
-        let pinned = TopologyGraph.NodeRef(kind: bottomNode.kind, index: bottomNode.index)
+        let pinned = BRepGraph.NodeRef(kind: bottomNode.kind, index: bottomNode.index)
         let uid = try #require(graph.uid(ofNodeKind: Int(pinned.kind.rawValue), index: pinned.index))
 
         let tool = try #require(OCCTSwift.Shape.box(origin: SIMD3(-1, 4, 8), width: 12, height: 2, depth: 4))
@@ -126,16 +126,16 @@ struct RemapTests {
         // a tool box straddling the top face of a 10x10x10 box bisects it
         // into two strips.
         let base = try #require(OCCTSwift.Shape.box(origin: SIMD3(0, 0, 0), width: 10, height: 10, depth: 10))
-        let graph = try #require(TopologyGraph(shape: base))
+        let graph = try #require(BRepGraph(shape: base))
         let rootNode = try #require(graph.findNode(for: base))
-        let root = TopologyGraph.NodeRef(kind: rootNode.kind, index: rootNode.index)
+        let root = BRepGraph.NodeRef(kind: rootNode.kind, index: rootNode.index)
 
         let faces = base.faces()
         let centroids = base.measure().faceCentroids
         let topIndex = try #require(centroids.enumerated().max { $0.element.z < $1.element.z }?.offset)
         let topFace = try #require(Shape.fromFace(faces[topIndex]))
         let topNode = try #require(graph.findNode(for: topFace))
-        let pinned = TopologyGraph.NodeRef(kind: topNode.kind, index: topNode.index)
+        let pinned = BRepGraph.NodeRef(kind: topNode.kind, index: topNode.index)
         let uid = try #require(graph.uid(ofNodeKind: Int(pinned.kind.rawValue), index: pinned.index))
 
         let tool = try #require(OCCTSwift.Shape.box(origin: SIMD3(-1, 4, 8), width: 12, height: 2, depth: 4))
@@ -167,16 +167,16 @@ struct RemapTests {
         // A tool that fully encloses one side face removes it from the result
         // entirely — `historyIsDeleted` distinguishes this from "untouched".
         let base = try #require(OCCTSwift.Shape.box(origin: SIMD3(0, 0, 0), width: 10, height: 10, depth: 10))
-        let graph = try #require(TopologyGraph(shape: base))
+        let graph = try #require(BRepGraph(shape: base))
         let rootNode = try #require(graph.findNode(for: base))
-        let root = TopologyGraph.NodeRef(kind: rootNode.kind, index: rootNode.index)
+        let root = BRepGraph.NodeRef(kind: rootNode.kind, index: rootNode.index)
 
         let faces = base.faces()
         let centroids = base.measure().faceCentroids
         let topIndex = try #require(centroids.enumerated().max { $0.element.z < $1.element.z }?.offset)
         let topFace = try #require(Shape.fromFace(faces[topIndex]))
         let topNode = try #require(graph.findNode(for: topFace))
-        let pinned = TopologyGraph.NodeRef(kind: topNode.kind, index: topNode.index)
+        let pinned = BRepGraph.NodeRef(kind: topNode.kind, index: topNode.index)
         let uid = try #require(graph.uid(ofNodeKind: Int(pinned.kind.rawValue), index: pinned.index))
 
         // A tool that engulfs the entire top face (oversized in X/Y, thin
@@ -202,7 +202,7 @@ struct RemapTests {
     @Test func t_isDeleted_falseForBodySubshape() throws {
         let ctx = makeContext()
         let obj = ctx.display(try makeBox())
-        let graph = try #require(TopologyGraph(shape: obj.shape))
+        let graph = try #require(BRepGraph(shape: obj.shape))
         #expect(ctx.isDeleted(.body(obj), in: graph) == false)
     }
 
@@ -210,16 +210,16 @@ struct RemapTests {
 
     @Test func t_remap_mixedSelection_bodyAndFace_remapEachIndependently() throws {
         let base = try #require(OCCTSwift.Shape.box(origin: SIMD3(0, 0, 0), width: 10, height: 10, depth: 10))
-        let graph = try #require(TopologyGraph(shape: base))
+        let graph = try #require(BRepGraph(shape: base))
         let rootNode = try #require(graph.findNode(for: base))
-        let root = TopologyGraph.NodeRef(kind: rootNode.kind, index: rootNode.index)
+        let root = BRepGraph.NodeRef(kind: rootNode.kind, index: rootNode.index)
 
         let faces = base.faces()
         let centroids = base.measure().faceCentroids
         let bottomIndex = try #require(centroids.enumerated().min { $0.element.z < $1.element.z }?.offset)
         let bottomFace = try #require(Shape.fromFace(faces[bottomIndex]))
         let bottomNode = try #require(graph.findNode(for: bottomFace))
-        let pinned = TopologyGraph.NodeRef(kind: bottomNode.kind, index: bottomNode.index)
+        let pinned = BRepGraph.NodeRef(kind: bottomNode.kind, index: bottomNode.index)
         let uid = try #require(graph.uid(ofNodeKind: Int(pinned.kind.rawValue), index: pinned.index))
 
         let tool = try #require(OCCTSwift.Shape.box(origin: SIMD3(-1, 4, 8), width: 12, height: 2, depth: 4))

@@ -5,7 +5,7 @@ import OCCTSwiftViewport
 @testable import OCCTSwiftAIS
 
 /// Acceptance-criteria coverage for issue #31: `InteractiveContext` retains one
-/// `TopologyGraph` instance per displayed object across mutations, and durable
+/// `BRepGraph` instance per displayed object across mutations, and durable
 /// identity survives shared-face topology that a render-path ordinal alone
 /// cannot distinguish.
 @MainActor
@@ -49,7 +49,7 @@ struct InteractiveContextMutationTests {
         let updated = try #require(ctx.update(obj, to: result2, absorbing: history2, operationName: "cut-side"))
 
         // Surviving across TWO successive absorbs only works if `update` reused
-        // the SAME TopologyGraph instance both times — a fresh graph on the
+        // the SAME BRepGraph instance both times — a fresh graph on the
         // second call would reject the first call's uid as foreign (#295) and
         // the selection would silently empty out.
         #expect(ctx.selection.count == 1, "bottom face should survive a second successive mutation")
@@ -122,7 +122,7 @@ struct InteractiveContextMutationTests {
         let body = try #require(ctx.sourceBody(for: obj))
         #expect(!body.faceIndices.isEmpty)
         var seenOrdinals: Set<Int> = []
-        var uidByOrdinal: [Int: TopologyGraph.GraphUID] = [:]
+        var uidByOrdinal: [Int: BRepGraph.GraphUID] = [:]
         for (triIdx, faceOrdinalRaw) in body.faceIndices.enumerated() {
             let ordinal = Int(faceOrdinalRaw)
             guard ordinal >= 0, !seenOrdinals.contains(ordinal) else { continue }

@@ -5,7 +5,7 @@ import OCCTSwift
 /// Test-only convenience: a `SubShapeRef` resolved directly from `object`'s
 /// shape at `index`, with no durable `uid` — for tests exercising geometry
 /// resolution (dimension anchors, `Selection` accessors) that don't need a
-/// `TopologyGraph` in the loop.
+/// `BRepGraph` in the loop.
 func faceRef(_ object: InteractiveObject, _ index: Int) throws -> SubShapeRef {
     SubShapeRef(shape: try #require(object.shape.subShape(type: .face, index: index)), ordinal: index)
 }

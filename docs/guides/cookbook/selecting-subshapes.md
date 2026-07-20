@@ -61,7 +61,7 @@ coordinates (OCCTSwift exposes vertices positionally, not as a `Vertex` class).
 ```swift
 public struct SubShapeRef: Hashable, Sendable {
     public let shape: Shape                       // the picked sub-shape itself
-    public let uid: TopologyGraph.GraphUID?        // durable handle, when a graph was in hand
+    public let uid: BRepGraph.GraphUID?        // durable handle, when a graph was in hand
     public let ordinal: Int                        // tessellation-time render-path index
 }
 ```
@@ -94,7 +94,7 @@ for you) rather than being hand-built like this.
 A render-path ordinal only means "face 5" while the exact tessellation it came from is unchanged. To
 carry a selection across a modelling operation that rebuilds the shape (a boolean, a fillet), use
 `InteractiveContext.update(_:to:absorbing:operationName:)` — it absorbs the operation's history into
-the object's own living `TopologyGraph` (built once at `display(_:style:)` and retained across every
+the object's own living `BRepGraph` (built once at `display(_:style:)` and retained across every
 subsequent `update` call) and remaps `selection` / `hover` forward automatically:
 
 ```swift

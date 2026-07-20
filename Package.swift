@@ -40,8 +40,12 @@ let package = Package(
         // `shapeToBodyMetadataAndIdentities(...)` (OCCTSwiftTools#43/#44),
         // closing the "edge/vertex uid minted ad hoc" gap #31 shipped with —
         // every pickable kind now gets durable identity from a real
-        // tessellation-time table, not just faces. See #31, #33.
-        occtDep("OCCTSwiftTools", from: "1.6.0"),
+        // tessellation-time table, not just faces. See #31, #33. Tools 1.6.1
+        // re-pins OCCTSwift to ≥1.15.0, where `TopologyGraph` was renamed to
+        // `BRepGraph` (OCCTSwift#333) — required now that this repo's own
+        // code names `BRepGraph` directly rather than the deprecated
+        // typealias. See #37.
+        occtDep("OCCTSwiftTools", from: "1.6.1"),
     ],
     targets: [
         .target(

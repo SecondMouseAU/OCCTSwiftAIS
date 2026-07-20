@@ -368,9 +368,9 @@ ais.bodies.removeAll { tri.ownsBody(id: $0.id) }
 
 A `SubShape`'s `SubShapeRef.ordinal` only means "this render-path index" while the exact tessellation
 it came from is unchanged. What actually survives a mutation is `SubShapeRef.uid` — a
-`TopologyGraph.GraphUID`, minted from a graph in hand at pick time.
+`BRepGraph.GraphUID`, minted from a graph in hand at pick time.
 
-`InteractiveContext` builds a `TopologyGraph` for each displayed object at `display(_:style:)` and
+`InteractiveContext` builds a `BRepGraph` for each displayed object at `display(_:style:)` and
 retains that *same instance* across every subsequent mutation. Call
 `update(_:to:absorbing:operationName:)` after running a modelling operation (any of OCCTSwift's
 `*WithFullHistory` methods) against the object's shape — it absorbs the operation's history into that
@@ -394,7 +394,7 @@ if let updated = ais.update(part, to: result, absorbing: history, operationName:
 }
 ```
 
-`update` composes two lower-level pieces you can use directly if you're managing the `TopologyGraph`
+`update` composes two lower-level pieces you can use directly if you're managing the `BRepGraph`
 yourself: `remap(_:using:rebindingTo:)` (translate a `Selection` through an absorbed-history graph) and
 `isDeleted(_:in:)` (tell "the operation consumed this sub-shape" apart from "it wasn't selected" — both
 otherwise look like "absent from the remapped selection"):

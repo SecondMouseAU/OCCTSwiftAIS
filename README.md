@@ -8,7 +8,7 @@ High-level **Application Interactive Services** for the OCCTSwift / OCCTSwiftVie
 
 Part of the [OCCTSwift ecosystem](https://github.com/SecondMouseAU/OCCTSwift/blob/main/docs/ecosystem.md) — see the ecosystem map for how this package fits with the kernel, viewport, and sibling layers.
 
-> Current: **v1.3.0**. SemVer-stable from v1.0.0, re-pinned to OCCTSwiftTools v1.6.0 / OCCTSwift v1.12.9+ (still the OCCT 8.0.0p1 GA cohort). See [SPEC.md](SPEC.md) for the design brief and [docs/CHANGELOG.md](docs/CHANGELOG.md) for per-release notes.
+> Current: **v1.3.1**. SemVer-stable from v1.0.0, re-pinned to OCCTSwiftTools v1.6.0 / OCCTSwift v1.15.0+ (still the OCCT 8.0.0p1 GA cohort). See [SPEC.md](SPEC.md) for the design brief and [docs/CHANGELOG.md](docs/CHANGELOG.md) for per-release notes.
 
 ## What's in the box
 
@@ -16,7 +16,7 @@ Part of the [OCCTSwift ecosystem](https://github.com/SecondMouseAU/OCCTSwift/blo
 - **Manipulator widgets** — translate and rotate gizmos with `snapTranslate` / `snapRotateDeg`, on the renderer's overlay layer (always-on-top), with native widget pick filtering. SwiftUI integration via `.attachManipulator(_:)`.
 - **Dimensions** — `LinearDimension`, `AngularDimension`, `RadialDimension`. Topology-aware anchors (vertex / edge midpoint / face bbox center / circular-edge center) feed into OCCTSwiftViewport's existing `MeasurementOverlay` for leader lines + billboarded label.
 - **Standard scene objects** — `Trihedron`, `WorkPlane`, `Axis`, `PointCloudPresentation`.
-- **Durable selection identity** — `SubShape` carries a `SubShapeRef` (the resolved `Shape` plus a `TopologyGraph.GraphUID` when a graph was in hand at pick time), not just a render-path ordinal. `InteractiveContext.update(_:to:absorbing:operationName:)` absorbs a modelling operation's history into the object's living `TopologyGraph`, and `remap(_:using:rebindingTo:)` resolves a pre-mutation `Selection` forward through it — a face split by the operation expands to all its successors; a deleted one is reported via `isDeleted(_:in:)`, never silently pointed at a coincidentally-adjacent neighbour.
+- **Durable selection identity** — `SubShape` carries a `SubShapeRef` (the resolved `Shape` plus a `BRepGraph.GraphUID` when a graph was in hand at pick time), not just a render-path ordinal. `InteractiveContext.update(_:to:absorbing:operationName:)` absorbs a modelling operation's history into the object's living `BRepGraph`, and `remap(_:using:rebindingTo:)` resolves a pre-mutation `Selection` forward through it — a face split by the operation expands to all its successors; a deleted one is reported via `isDeleted(_:in:)`, never silently pointed at a coincidentally-adjacent neighbour.
 - **Topology-aware selection filters** — `SurfaceTypeFilter`, `CurveTypeFilter`, `ShapeTypeFilter`, composed with `AllOfFilter` / `AnyOfFilter` / `NotFilter` / `PredicateFilter`, installed via `InteractiveContext.addFilter(_:)` to restrict what's pickable/hoverable beyond `selectionMode`.
 - **Rectangle and lasso area selection** — `InteractiveContext.selectRectangle(from:to:)` / `selectPolygon(_:)`, honouring `selectionMode` and installed filters; `.attachAreaSelection(_:)` wires up the drag gesture, a live rubber-band/lasso overlay, and camera-orbit passthrough when not actively marqueeing.
 

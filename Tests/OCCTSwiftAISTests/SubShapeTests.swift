@@ -52,8 +52,8 @@ struct SubShapeTests {
         // Two refs with the same uid but different ordinals are equal — the
         // durable handle is the identity, not the render-path index.
         let shape = try #require(Shape.box(width: 4, height: 4, depth: 4))
-        let graph = try #require(TopologyGraph(shape: shape))
-        let uid = try #require(graph.uid(ofNodeKind: Int(TopologyGraph.NodeKind.face.rawValue), index: 0))
+        let graph = try #require(BRepGraph(shape: shape))
+        let uid = try #require(graph.uid(ofNodeKind: Int(BRepGraph.NodeKind.face.rawValue), index: 0))
         let a = SubShapeRef(shape: shape, uid: uid, ordinal: 0)
         let b = SubShapeRef(shape: shape, uid: uid, ordinal: 99)
         #expect(a == b)
@@ -62,8 +62,8 @@ struct SubShapeTests {
 
     @Test func t_refWithUID_notEqualToRefWithoutUID_evenAtSameOrdinal() throws {
         let shape = try #require(Shape.box(width: 4, height: 4, depth: 4))
-        let graph = try #require(TopologyGraph(shape: shape))
-        let uid = try #require(graph.uid(ofNodeKind: Int(TopologyGraph.NodeKind.face.rawValue), index: 0))
+        let graph = try #require(BRepGraph(shape: shape))
+        let uid = try #require(graph.uid(ofNodeKind: Int(BRepGraph.NodeKind.face.rawValue), index: 0))
         let withUID = SubShapeRef(shape: shape, uid: uid, ordinal: 0)
         let withoutUID = SubShapeRef(shape: shape, ordinal: 0)
         #expect(withUID != withoutUID)
