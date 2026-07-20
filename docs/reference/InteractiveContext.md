@@ -21,7 +21,7 @@ Bind it via `MetalViewportView(controller: ctx.viewport, bodies: $ctx.bodies)` w
 
 ## Topics
 
-- [Published properties](#published-properties) · [display(_:style:)](#display_style) · [remove(_:)](#remove_) · [removeAll()](#removeall) · [Selection mutation](#selection-mutation) · [setStyle(_:for:)](#setstyle_for) · [setHighlightStyle(_:)](#sethighlightstyle_) · [add(_:)](#add_) · [remove(_:)-dimension](#remove_-dimension) · [dimensions](#dimensions) · [refreshDimensionMeasurement(_:)](#refreshdimensionmeasurement_) · [remap(_:using:rebindingTo:strategy:)](#remap_usingrebindingtostrategy)
+- [Published properties](#published-properties) · [display(_:style:)](#display_style) · [update(_:to:absorbing:operationName:)](#update_toabsorbingoperationname) · [remove(_:)](#remove_) · [removeAll()](#removeall) · [Selection mutation](#selection-mutation) · [setStyle(_:for:)](#setstyle_for) · [setHighlightStyle(_:)](#sethighlightstyle_) · [add(_:)](#add_) · [remove(_:)-dimension](#remove_-dimension) · [dimensions](#dimensions) · [refreshDimensionMeasurement(_:)](#refreshdimensionmeasurement_) · [remap(_:using:rebindingTo:)](#remap_usingrebindingto) · [isDeleted(_:in:)](#isdeleted_in)
 
 ---
 
@@ -71,6 +71,45 @@ let part = ais.display(Shape.box(width: 10, height: 5, depth: 3)!,
                        style: .highlighted)
 ```
 
+`display` also builds a `TopologyGraph` from `shape` and retains it for the object's lifetime — see
+`update(_:to:absorbing:operationName:)`, below, for what that's for.
+
+---
+
+## update(_:to:absorbing:operationName:)
+
+Update a displayed object after a modelling operation that rebuilds its shape — a boolean, a fillet, a
+chamfer, anything produced via one of OCCTSwift's `*WithFullHistory` methods run against `object.shape`.
+Absorbs the operation's history into the object's living `TopologyGraph` (built once in `display`,
+retained across every subsequent `update` call — the input and result share one graph instance, so
+every `SubShapeRef.uid` already held stays resolvable), rebuilds the displayed mesh, and remaps any
+current `selection` / `hover` sub-shapes referencing `object` forward via `remap(_:using:rebindingTo:)`.
+
+```swift
+@discardableResult
+public func update(
+    _ object: InteractiveObject,
+    to newShape: Shape,
+    absorbing history: ShapeHistoryRef,
+    operationName: String
+) -> InteractiveObject?
+```
+
+- **Parameters:** `object` — the currently-displayed object being mutated; `newShape` — the operation's
+  result; `history` — the handle returned alongside it by any `*WithFullHistory` method; `operationName`
+  — a label recorded on every emitted history record.
+- **Returns:** the updated `InteractiveObject` (same `id`, new `shape`), or `nil` if `object` isn't
+  displayed, has no living graph (construction failed at `display` time), or the absorb fails — in any
+  of those cases, `remove` and `display` fresh, accepting that the selection doesn't survive.
+- **Example:**
+
+```swift
+let (result, history) = part.shape.subtractedWithFullHistory(tool)!
+if let updated = ais.update(part, to: result, absorbing: history, operationName: "cut") {
+    part = updated
+}
+```
+
 ---
 
 ## remove(_:)
@@ -118,11 +157,16 @@ public func clearSelection()
 - **Example:**
 
 ```swift
-ais.select(.face(part, faceIndex: 0))   // additive
-ais.select(.face(part, faceIndex: 2))
-ais.deselect(.face(part, faceIndex: 0))
+let face0 = part.shape.subShape(type: .face, index: 0)!
+let face2 = part.shape.subShape(type: .face, index: 2)!
+ais.select(.face(part, ref: SubShapeRef(shape: face0, ordinal: 0)))   // additive
+ais.select(.face(part, ref: SubShapeRef(shape: face2, ordinal: 2)))
+ais.deselect(.face(part, ref: SubShapeRef(shape: face0, ordinal: 0)))
 ais.clearSelection()
 ```
+
+In practice most selections come from a pick — `handlePick` mints the `SubShapeRef` (uid included)
+for you.
 
 ---
 
@@ -172,8 +216,9 @@ public func add<D: Dimension>(_ dimension: D) -> D
 - **Example:**
 
 ```swift
-let lin = ais.add(LinearDimension(from: .vertex(part, vertexIndex: 0),
-                                  to:   .vertex(part, vertexIndex: 6)))
+let v0 = SubShapeRef(shape: part.shape.subShape(type: .vertex, index: 0)!, ordinal: 0)
+let v6 = SubShapeRef(shape: part.shape.subShape(type: .vertex, index: 6)!, ordinal: 6)
+let lin = ais.add(LinearDimension(from: .vertex(part, ref: v0), to: .vertex(part, ref: v6)))
 ```
 
 ---
@@ -227,30 +272,55 @@ ais.refreshDimensionMeasurement(lin)
 
 ---
 
-## remap(_:using:rebindingTo:strategy:)
+## remap(_:using:rebindingTo:)
 
-Remap a `Selection` captured against an earlier shape state to a post-mutation shape's indices, using
-the history records on a `TopologyGraph` built from the post-mutation shape.
+Remap a `Selection` whose sub-shapes were captured against an earlier shape state into a new
+`Selection` against `newObject`, using history absorbed into `graph` via
+`TopologyGraph.add(_:absorbing:inputRoots:operationName:)`. This is the lower-level primitive
+`update(_:to:absorbing:operationName:)` calls internally — reach for it directly only if you're
+managing the `TopologyGraph` yourself rather than going through `update`.
 
 ```swift
 public func remap(
     _ selection: Selection,
     using graph: TopologyGraph,
-    rebindingTo newObject: InteractiveObject,
-    strategy: RemapStrategy = .dropMissing
+    rebindingTo newObject: InteractiveObject
 ) -> Selection
 ```
 
-- **Parameters:** `selection` — the pre-mutation selection; `graph` — a `TopologyGraph` from the
-  post-mutation shape with history recorded; `newObject` — the post-mutation scene object the result
-  references; `strategy` — how to handle sub-shapes the history doesn't mention.
-- **Returns:** a `Selection` against `newObject`. `1 → 1` keeps the new index, `1 → N` (e.g. a split
-  edge) expands into N entries, `1 → 0` (deleted) is handled per `strategy`; `.body(_)` always rebinds.
+- **Parameters:** `selection` — the pre-mutation selection; `graph` — the `TopologyGraph` that absorbed
+  the operation's history (input and result must share this one instance); `newObject` — the
+  post-mutation scene object the result references.
+- **Returns:** a `Selection` against `newObject`, resolved through each sub-shape's `SubShapeRef.uid` —
+  never a stored index. `1 → 1` (modified in place) keeps the same node re-resolved to a fresh uid;
+  `1 → N` (e.g. a face split by a cut) expands into N entries; `1 → 0` (deleted) is dropped — see
+  `isDeleted(_:in:)`. A sub-shape with no `uid` is dropped: there's nothing durable to resolve it by.
+  `.body(_)` always rebinds to `newObject`.
 - **Example:**
 
 ```swift
-ais.remove(oldObj)
-let newObj = ais.display(newShape)
 let remapped = ais.remap(oldSelection, using: graph, rebindingTo: newObj)
 for sub in remapped.subshapes { ais.select(sub) }
+```
+
+---
+
+## isDeleted(_:in:)
+
+Whether a sub-shape's durable node was explicitly consumed by history absorbed into `graph` — as
+opposed to simply never being mentioned by any recorded operation. `remap`'s silent drop can't tell
+these apart on its own; both look like "absent from the result."
+
+```swift
+public func isDeleted(_ subshape: SubShape, in graph: TopologyGraph) -> Bool
+```
+
+- **Returns:** `false` for `.body` sub-shapes, and for any sub-shape with no `uid` or whose `uid` isn't
+  `graph`'s own — there's no node in `graph` to ask about.
+- **Example:**
+
+```swift
+if ais.isDeleted(pickedFace, in: graph) {
+    print("the cut removed that face entirely")
+}
 ```

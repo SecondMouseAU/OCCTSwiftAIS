@@ -211,12 +211,12 @@ enum DimensionAnchor {
         switch subshape {
         case .body(let obj):
             return resolveBody(obj)
-        case .face(let obj, let idx):
-            return resolveFace(obj, faceIndex: idx)
-        case .edge(let obj, let idx):
-            return resolveEdge(obj, edgeIndex: idx)
-        case .vertex(let obj, let idx):
-            return resolveVertex(obj, vertexIndex: idx)
+        case .face(_, let ref):
+            return resolveFace(ref)
+        case .edge(_, let ref):
+            return resolveEdge(ref)
+        case .vertex(_, let ref):
+            return resolveVertex(ref)
         }
     }
 
@@ -227,29 +227,26 @@ enum DimensionAnchor {
         return SIMD3<Float>(Float(center.x), Float(center.y), Float(center.z))
     }
 
-    private static func resolveFace(_ obj: InteractiveObject, faceIndex: Int) -> SIMD3<Float> {
+    private static func resolveFace(_ ref: SubShapeRef) -> SIMD3<Float> {
         // Bbox center of the face — cheap, robust for axis-aligned faces.
         // Curved faces would be better served by the area-weighted centroid
         // (`ShapeMeasurements.faceCentroids` from OCCTSwift) but that's an
         // O(faces) computation; bbox center is constant time per face.
-        guard let faceShape = obj.shape.subShape(type: .face, index: faceIndex),
-              let face = OCCTSwift.Face(faceShape) else {
-            return .zero
-        }
+        guard let face = OCCTSwift.Face(ref.shape) else { return .zero }
         let (lo, hi) = face.bounds
         let center = (lo + hi) * 0.5
         return SIMD3<Float>(Float(center.x), Float(center.y), Float(center.z))
     }
 
-    private static func resolveEdge(_ obj: InteractiveObject, edgeIndex: Int) -> SIMD3<Float> {
-        guard let edge = obj.shape.edge(at: edgeIndex) else { return .zero }
+    private static func resolveEdge(_ ref: SubShapeRef) -> SIMD3<Float> {
+        guard let edge = OCCTSwift.Edge(ref.shape) else { return .zero }
         let ends = edge.endpoints
         let mid = (ends.start + ends.end) * 0.5
         return SIMD3<Float>(Float(mid.x), Float(mid.y), Float(mid.z))
     }
 
-    private static func resolveVertex(_ obj: InteractiveObject, vertexIndex: Int) -> SIMD3<Float> {
-        guard let p = obj.shape.vertex(at: vertexIndex) else { return .zero }
+    private static func resolveVertex(_ ref: SubShapeRef) -> SIMD3<Float> {
+        guard let p = ref.shape.vertices().first else { return .zero }
         return SIMD3<Float>(Float(p.x), Float(p.y), Float(p.z))
     }
 
@@ -258,8 +255,8 @@ enum DimensionAnchor {
     /// guaranteed to lie on the circle when the edge is a circular arc /
     /// closed circle.
     static func resolveCircle(_ subshape: SubShape) -> (SIMD3<Float>, SIMD3<Float>, Float)? {
-        guard case .edge(let obj, let idx) = subshape,
-              let edge = obj.shape.edge(at: idx),
+        guard case .edge(_, let ref) = subshape,
+              let edge = OCCTSwift.Edge(ref.shape),
               edge.isCircle,
               let curve = edge.curve3D else {
             return nil

@@ -216,10 +216,9 @@ A `Dimension` is a labeled measurement anchored on sub-shapes. Three concrete ty
 let part = ais.display(Shape.cylinder(radius: 4, height: 8)!)
 
 // Linear distance between two corners.
-let lin = LinearDimension(
-    from: .vertex(part, vertexIndex: 0),
-    to:   .vertex(part, vertexIndex: 7)
-)
+let v0 = SubShapeRef(shape: part.shape.subShape(type: .vertex, index: 0)!, ordinal: 0)
+let v7 = SubShapeRef(shape: part.shape.subShape(type: .vertex, index: 7)!, ordinal: 7)
+let lin = LinearDimension(from: .vertex(part, ref: v0), to: .vertex(part, ref: v7))
 ais.add(lin)
 print(lin.label)        // formatted distance, e.g. "9.85"
 print(lin.distance)     // raw Float
@@ -227,8 +226,9 @@ print(lin.distance)     // raw Float
 // Find the first circular edge on the cylinder and dimension it.
 for i in 0..<part.shape.edgeCount {
     if let edge = part.shape.edge(at: i), edge.isCircle {
+        let edgeShape = part.shape.subShape(type: .edge, index: i)!
         let rad = RadialDimension(
-            circularEdge: .edge(part, edgeIndex: i),
+            circularEdge: .edge(part, ref: SubShapeRef(shape: edgeShape, ordinal: i)),
             showDiameter: false
         )
         ais.add(rad)
@@ -253,12 +253,15 @@ in one go.
 
 ### Anchor resolution by sub-shape kind
 
+Anchors resolve directly from each sub-shape's `SubShapeRef.shape` — never from a re-derived index
+lookup on the source `Shape`:
+
 | `SubShape` | Anchor world point |
 | --- | --- |
 | `.body(_)` | bbox center of `Shape.bounds` |
-| `.face(_, idx)` | bbox center of `Face.bounds` |
-| `.edge(_, idx)` | midpoint of `Edge.endpoints` |
-| `.vertex(_, idx)` | `Shape.vertex(at: idx)` |
+| `.face(_, ref)` | bbox center of `Face(ref.shape).bounds` |
+| `.edge(_, ref)` | midpoint of `Edge(ref.shape).endpoints` |
+| `.vertex(_, ref)` | `ref.shape.vertices().first` |
 
 These are constant-time lookups. Curved-face area-weighted centroids and arc-length edge midpoints are
 future refinements.
@@ -292,46 +295,49 @@ ais.bodies.removeAll { tri.ownsBody(id: $0.id) }
 
 ## 8. Selection survival across `Shape` mutation
 
-`SubShape.face(_, faceIndex: 5)` only means "face 5" while the underlying `Shape` is unchanged. After
-a boolean op or a fillet, indices renumber.
+A `SubShape`'s `SubShapeRef.ordinal` only means "this render-path index" while the exact tessellation
+it came from is unchanged. What actually survives a mutation is `SubShapeRef.uid` — a
+`TopologyGraph.GraphUID`, minted from a graph in hand at pick time.
 
-`InteractiveContext.remap(_:using:rebindingTo:strategy:)` translates an old `Selection` to a new
-shape's indices using OCCTSwift's history records on a `TopologyGraph`:
+`InteractiveContext` builds a `TopologyGraph` for each displayed object at `display(_:style:)` and
+retains that *same instance* across every subsequent mutation. Call
+`update(_:to:absorbing:operationName:)` after running a modelling operation (any of OCCTSwift's
+`*WithFullHistory` methods) against the object's shape — it absorbs the operation's history into that
+living graph and remaps `selection` / `hover` forward automatically:
 
 ```swift
-let oldShape = Shape.box(width: 10, height: 10, depth: 10)!
-let oldObj = ais.display(oldShape)
-ais.select(.face(oldObj, faceIndex: 0))
+let base = Shape.box(width: 10, height: 10, depth: 10)!
+var part = ais.display(base)
+ais.selectionMode = [.face]
+// ... a pick selects a face; ais.selection now holds a SubShapeRef with a uid ...
 
-// User mutates the shape — typically a fillet or boolean op.
-// Build a TopologyGraph from the post-mutation shape with history recorded:
-let newShape = ...
-let graph = TopologyGraph(shape: newShape, parallel: false)!
-graph.isHistoryEnabled = true
-// (operations between old and new shape get recorded into `graph` here)
-
-// Replace the displayed object with the new shape:
-ais.remove(oldObj)
-let newObj = ais.display(newShape)
-
-// And carry the selection forward:
-let oldSelection = ais.selection
-ais.clearSelection()
-let remapped = ais.remap(oldSelection, using: graph, rebindingTo: newObj)
-for sub in remapped.subshapes {
-    ais.select(sub)
+// Run the operation, then hand the result + its history to update(_:to:absorbing:operationName:):
+let tool = Shape.box(origin: SIMD3(-1, 4, 8), width: 12, height: 2, depth: 4)!
+let (result, history) = base.subtractedWithFullHistory(tool)!
+if let updated = ais.update(part, to: result, absorbing: history, operationName: "cut") {
+    part = updated
+    // ais.selection now references `updated`:
+    //  - a face the cut left untouched keeps its selection, re-resolved to a fresh uid
+    //  - a face the cut split into two expands into two .face entries
+    //  - a face the cut deleted entirely is dropped — see isDeleted(_:in:) below
 }
 ```
 
-`RemapStrategy` controls what happens for sub-shapes the history doesn't mention:
+`update` composes two lower-level pieces you can use directly if you're managing the `TopologyGraph`
+yourself: `remap(_:using:rebindingTo:)` (translate a `Selection` through an absorbed-history graph) and
+`isDeleted(_:in:)` (tell "the operation consumed this sub-shape" apart from "it wasn't selected" — both
+otherwise look like "absent from the remapped selection"):
 
-- `.dropMissing` (default) — drop them. Safest.
-- `.keepUnchanged` — preserve the original index. Only safe if you know the operation didn't shift
-  ordering (attribute-only edits, in-place transforms).
+```swift
+if ais.isDeleted(somePickedFace, in: graph) {
+    print("that face is gone — the cut removed it entirely")
+}
+```
 
-The 1-to-N case — e.g. an edge split by a fillet — automatically expands: a single
-`.edge(_, edgeIndex: 0)` in the old selection becomes two entries in the new one if the history
-records two replacements.
+Resolution goes entirely through each sub-shape's `uid`, never a stored index — so a sub-shape can
+never end up silently pointing at a coincidentally-adjacent neighbour the way an index-based remap
+could. A sub-shape with no `uid` at all (no graph was in hand when it was picked) is dropped: there's
+nothing durable to resolve it by.
 
 ## Where to next
 

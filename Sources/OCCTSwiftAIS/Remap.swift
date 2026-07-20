@@ -1,108 +1,111 @@
 import Foundation
 import OCCTSwift
-
-/// How `InteractiveContext.remap` handles sub-shapes whose original node has
-/// no derivatives in the post-mutation graph.
-///
-/// **Caveat:** `TopologyGraph.findDerived(_:)` returns an empty list both for
-/// "node not mentioned in any history record" *and* for "node explicitly
-/// recorded as deleted (replacements: `[]`)". The two cases aren't
-/// distinguishable through the current OCCTSwift surface, so:
-///
-/// - `.dropMissing` treats both the same way — it drops, which is correct for
-///   deletions and conservative for unmentioned nodes.
-/// - `.keepUnchanged` keeps both — which is correct for unmentioned nodes
-///   that are presumed unchanged, and **incorrect** for explicitly-deleted
-///   nodes. Use `.keepUnchanged` only when you know the operation didn't
-///   delete anything (attribute-only edits, in-place transforms).
-public enum RemapStrategy: Sendable {
-    case dropMissing
-    case keepUnchanged
-}
+import OCCTSwiftTools
 
 extension InteractiveContext {
 
-    /// Remap a `Selection` whose sub-shape indices were captured against an
-    /// earlier shape state, using the history records on a `TopologyGraph`
-    /// built from the post-mutation shape, into a new `Selection` whose
-    /// indices apply against `newObject`.
+    /// Remap a `Selection` whose sub-shapes were captured against an earlier
+    /// shape state into a new `Selection` against `newObject`, using history
+    /// absorbed into `graph` via `TopologyGraph.add(_:absorbing:inputRoots:operationName:)`.
     ///
-    /// For each sub-shape the remap walks `graph.findDerived(of:)`:
+    /// Resolution goes entirely through each sub-shape's durable `GraphUID` —
+    /// never a stored ordinal — so there is no index-correlation guesswork:
+    /// `TopologyGraph.node(forUID:)` rejects a uid that didn't come from
+    /// `graph` itself, so a sub-shape can never resolve to a coincidentally
+    /// matching but wrong neighbour the way a raw-index lookup could. A
+    /// `.face`/`.edge`/`.vertex` sub-shape with no `uid` at all (no graph was
+    /// in hand at pick time) is dropped — there's nothing durable to resolve
+    /// it by.
     ///
-    /// - **1 → 1** (face modified in place): the result has the new index.
-    /// - **1 → N** (e.g. an edge split by a fillet): the result expands into
-    ///   N sub-shapes, one per derived node.
-    /// - **1 → 0** (deleted): handled per `strategy`.
+    /// - **1 → 1** (sub-shape modified in place): the result carries the same
+    ///   node, re-resolved to its current index and a freshly minted uid.
+    /// - **1 → N** (e.g. a face split by a cut): expands to N sub-shapes, one
+    ///   per live successor.
+    /// - **1 → 0** (deleted): dropped silently. Call `isDeleted(_:in:)` first
+    ///   (same `graph`) to tell a deletion from a sub-shape that was simply
+    ///   never selected.
     ///
     /// `.body(_)` sub-shapes always rebind to `newObject` — the body-level
-    /// concept is identity-stable across mutations.
+    /// concept is identity-stable across mutations by construction.
     ///
-    /// - Parameters:
-    ///   - selection: The pre-mutation selection.
-    ///   - graph: A `TopologyGraph` built from the post-mutation shape with
-    ///            history recorded for the operations between the two states.
-    ///   - newObject: The `InteractiveObject` representing the post-mutation
-    ///            shape in the scene. The remapped sub-shapes will reference it.
-    ///   - strategy: How to handle sub-shapes the history doesn't mention.
-    /// - Returns: A `Selection` against `newObject`.
+    /// Face successors get their render-path `ordinal` from `newObject`'s
+    /// `FaceIdentityTable` (matched by uid) when `newObject` is displayed in
+    /// this context; otherwise (or for edge/vertex successors, which have no
+    /// identity table upstream yet — see #31) the ordinal falls back to the
+    /// graph's own node index, which is *not* a tessellation ordinal and
+    /// should not be used to index a `ViewportBody`'s per-triangle buffers.
     public func remap(
         _ selection: Selection,
         using graph: TopologyGraph,
-        rebindingTo newObject: InteractiveObject,
-        strategy: RemapStrategy = .dropMissing
+        rebindingTo newObject: InteractiveObject
     ) -> Selection {
+        let identity = identityTable(for: newObject)
         var result: Set<SubShape> = []
         for sub in selection.subshapes {
             switch sub {
             case .body:
                 result.insert(.body(newObject))
 
-            case .face(_, let idx):
-                let newIndices = remapIndices(
-                    originalIndex: idx, kind: .face, graph: graph, strategy: strategy
-                )
-                for i in newIndices where i < graph.faceCount {
-                    result.insert(.face(newObject, faceIndex: i))
+            case .face(_, let ref):
+                for successor in remapRef(ref, kind: .face, graph: graph, identity: identity) {
+                    result.insert(.face(newObject, ref: successor))
                 }
 
-            case .edge(_, let idx):
-                let newIndices = remapIndices(
-                    originalIndex: idx, kind: .edge, graph: graph, strategy: strategy
-                )
-                for i in newIndices where i < graph.edgeCount {
-                    result.insert(.edge(newObject, edgeIndex: i))
+            case .edge(_, let ref):
+                for successor in remapRef(ref, kind: .edge, graph: graph, identity: identity) {
+                    result.insert(.edge(newObject, ref: successor))
                 }
 
-            case .vertex(_, let idx):
-                let newIndices = remapIndices(
-                    originalIndex: idx, kind: .vertex, graph: graph, strategy: strategy
-                )
-                for i in newIndices where i < graph.vertexCount {
-                    result.insert(.vertex(newObject, vertexIndex: i))
+            case .vertex(_, let ref):
+                for successor in remapRef(ref, kind: .vertex, graph: graph, identity: identity) {
+                    result.insert(.vertex(newObject, ref: successor))
                 }
             }
         }
         return Selection(result)
     }
 
-    private func remapIndices(
-        originalIndex: Int,
+    /// Whether `subshape`'s durable node was explicitly consumed by history
+    /// absorbed into `graph` — as opposed to simply never being mentioned by
+    /// any recorded operation. Distinguishes "the operation deleted this" from
+    /// "this wasn't touched" / "this wasn't selected", which `remap`'s silent
+    /// drop can't on its own (see `TopologyGraph.historyIsDeleted(_:)`).
+    ///
+    /// `.body` sub-shapes and sub-shapes with no `uid`, or whose `uid` isn't
+    /// `graph`'s own, always return `false` — there's no node in `graph` to
+    /// ask about.
+    public func isDeleted(_ subshape: SubShape, in graph: TopologyGraph) -> Bool {
+        guard let ref = subshape.ref, let uid = ref.uid,
+              let node = graph.node(forUID: uid) else { return false }
+        let kind: TopologyGraph.NodeKind
+        switch subshape {
+        case .body:   return false
+        case .face:   kind = .face
+        case .edge:   kind = .edge
+        case .vertex: kind = .vertex
+        }
+        return graph.historyIsDeleted(TopologyGraph.NodeRef(kind: kind, index: node.index))
+    }
+
+    private func remapRef(
+        _ ref: SubShapeRef,
         kind: TopologyGraph.NodeKind,
         graph: TopologyGraph,
-        strategy: RemapStrategy
-    ) -> [Int] {
-        let original = TopologyGraph.NodeRef(kind: kind, index: originalIndex)
-        let derived = graph.findDerived(of: original)
-        if !derived.isEmpty {
-            return derived.compactMap { d in d.kind == kind ? d.index : nil }
-        }
-        // No recorded derivatives. Strategy decides whether the original
-        // index survives untouched or gets dropped.
-        switch strategy {
-        case .dropMissing:
-            return []
-        case .keepUnchanged:
-            return [originalIndex]
+        identity: FaceIdentityTable?
+    ) -> [SubShapeRef] {
+        guard let uid = ref.uid, let node = graph.node(forUID: uid) else { return [] }
+        let original = TopologyGraph.NodeRef(kind: kind, index: node.index)
+        let successors = graph.findDerivedOrSelf(of: original).filter { $0.kind == kind }
+        return successors.compactMap { successor in
+            guard let shape = graph.shape(nodeKind: successor.kind, nodeIndex: successor.index) else {
+                return nil
+            }
+            let newUID = graph.uid(ofNodeKind: Int(successor.kind.rawValue), index: successor.index)
+            var ordinal = successor.index
+            if let newUID, let matched = identity?.uids?.firstIndex(of: newUID) {
+                ordinal = matched
+            }
+            return SubShapeRef(shape: shape, uid: newUID, ordinal: ordinal)
         }
     }
 }

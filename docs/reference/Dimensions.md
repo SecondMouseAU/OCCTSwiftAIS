@@ -63,8 +63,9 @@ public final class LinearDimension: Dimension, @unchecked Sendable {
 - **Example:**
 
 ```swift
-let lin = LinearDimension(from: .vertex(part, vertexIndex: 0),
-                          to:   .vertex(part, vertexIndex: 6))
+let v0 = SubShapeRef(shape: part.shape.subShape(type: .vertex, index: 0)!, ordinal: 0)
+let v6 = SubShapeRef(shape: part.shape.subShape(type: .vertex, index: 6)!, ordinal: 6)
+let lin = LinearDimension(from: .vertex(part, ref: v0), to: .vertex(part, ref: v6))
 ais.add(lin)
 print(lin.distance, lin.label)
 ```
@@ -96,10 +97,10 @@ public final class AngularDimension: Dimension, @unchecked Sendable {
 - **Example:**
 
 ```swift
-let ang = AngularDimension(
-    arms: (.vertex(part, vertexIndex: 1), .vertex(part, vertexIndex: 3)),
-    apex: .vertex(part, vertexIndex: 0)
-)
+let v0 = SubShapeRef(shape: part.shape.subShape(type: .vertex, index: 0)!, ordinal: 0)
+let v1 = SubShapeRef(shape: part.shape.subShape(type: .vertex, index: 1)!, ordinal: 1)
+let v3 = SubShapeRef(shape: part.shape.subShape(type: .vertex, index: 3)!, ordinal: 3)
+let ang = AngularDimension(arms: (.vertex(part, ref: v1), .vertex(part, ref: v3)), apex: .vertex(part, ref: v0))
 ais.add(ang)
 print(ang.degrees)   // e.g. 90.0
 ```
@@ -133,7 +134,9 @@ public final class RadialDimension: Dimension, @unchecked Sendable {
 
 ```swift
 for i in 0..<cyl.shape.edgeCount where cyl.shape.edge(at: i)?.isCircle == true {
-    let rad = RadialDimension(circularEdge: .edge(cyl, edgeIndex: i), showDiameter: false)
+    let edgeShape = cyl.shape.subShape(type: .edge, index: i)!
+    let rad = RadialDimension(circularEdge: .edge(cyl, ref: SubShapeRef(shape: edgeShape, ordinal: i)),
+                              showDiameter: false)
     ais.add(rad)
     print(rad.radius, rad.label)   // 4.0  "R4.00"
     break

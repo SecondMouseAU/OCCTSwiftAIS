@@ -5,7 +5,29 @@ nav_order: 5
 
 # Changelog
 
-Most recent first. Pre-1.0: free to break; deprecations documented here.
+Most recent first. Breaking changes and deprecations documented here.
+
+## v1.1.0 — 2026-07-20
+
+Durable sub-shape identity, replacing the index-remap path with `TopologyGraph` absorbed history. Closes [#31](https://github.com/SecondMouseAU/OCCTSwiftAIS/issues/31).
+
+**Breaking:**
+
+- `SubShape.face`/`.edge`/`.vertex` now carry a `ref: SubShapeRef` instead of a bare `Int` index — `SubShapeRef` bundles the resolved `Shape`, an optional `TopologyGraph.GraphUID` (durable — minted when a graph was in hand at pick time), and the tessellation-time `ordinal` (render-path only). `SubShapeRef` equality/hashing follows `uid` when both sides have one, falling back to `ordinal` only when neither does.
+- `RemapStrategy` (`.dropMissing` / `.keepUnchanged`) is removed. `InteractiveContext.remap(_:using:rebindingTo:)` no longer takes a `strategy:` — it resolves every sub-shape through its `uid` via `TopologyGraph.node(forUID:)` (which rejects a uid minted by a different graph instance rather than resolving to a coincidentally-matching node) and `findDerivedOrSelf(of:)`. A sub-shape with no `uid` is dropped; there is no more "keep the old index and hope" fallback, because there's no ambiguity left for one to paper over.
+- `Selection.faces` / `.edges` / `.vertices` resolve directly from each entry's `SubShapeRef.shape` — the `Shape.subShape(type:index:)` round-trip on a stored ordinal is gone.
+
+**Added:**
+
+- `InteractiveContext.update(_:to:absorbing:operationName:)` — update a displayed object after a modelling operation (any OCCTSwift `*WithFullHistory` method). Absorbs the operation's history into the object's living `TopologyGraph` (built once at `display(_:style:)`, retained across every subsequent `update` call — the whole point being that `GraphUID`s minted before a mutation stay resolvable after it), rebuilds the mesh, and remaps `selection`/`hover` forward automatically.
+- `InteractiveContext.isDeleted(_:in:)` — distinguishes "the operation consumed this sub-shape" (`TopologyGraph.historyIsDeleted(_:)`) from "it wasn't selected," which a silent `remap` drop can't do on its own.
+- Face picks consume `OCCTSwiftTools.FaceIdentityTable` (v1.5.0, OCCTSwiftTools#42) instead of re-deriving a `TopoDS_Face` from `Shape.subShapes(ofType:)[ordinal]` — the two enumerations diverge once a face is shared between shells, which is exactly the coincidence this closes.
+
+**Known limitation:** `FaceIdentityTable` is faces-only upstream. Edge/vertex `SubShapeRef.uid`s are minted directly at pick time (`TopologyGraph.findNode(for:)` on the ordinal-resolved edge/vertex `Shape`) rather than from a tessellation-time identity table, so they carry the same residual ordinal-coincidence risk `FaceIdentityTable` was built to eliminate for faces. Filed as [OCCTSwiftTools#43](https://github.com/SecondMouseAU/OCCTSwiftTools/issues/43).
+
+**Dependencies:** `OCCTSwiftTools` floor raised `1.1.2` → `1.5.0` (re-pins the cohort onto current `OCCTSwift` — `1.12.9+`, still the OCCT 8.0.0p1 GA cohort — and ships `shapeToBodyMetadataAndIdentity(...graph:)` + `FaceIdentityTable`).
+
+**Tests:** 12 new (`t_remap_faceUntouchedByOperation_resolvesToItself`, `t_remap_faceSplitByChannelCut_expandsToBothStrips`, `t_remap_faceEntirelyRemoved_isDroppedAndReportedDeleted`, `t_remap_uidForeignToGraph_isDropped`, `t_update_retainsSameGraphAcrossTwoSuccessiveMutations`, `t_sharedFaceBetweenShells_everyPickResolvesToCorrectSubShape` (multi-shell shared-face regression, mirroring OCCTSwiftTools' own `FaceIdentityTableTests` fixture end-to-end through `InteractiveContext`), and others). **162 across 15 suites**, all green.
 
 ## v0.7.2 — 2026-05-07
 

@@ -61,6 +61,16 @@ public final class InteractiveContext: ObservableObject {
     public func remove(_ object: InteractiveObject)
     public func removeAll()
 
+    /// Update a displayed object after a modelling operation (`*WithFullHistory`)
+    /// that rebuilds its shape — absorbs the operation's history into the
+    /// object's living `TopologyGraph` and remaps `selection`/`hover` forward.
+    /// See "Selection survival across mutation" below.
+    @discardableResult
+    public func update(_ object: InteractiveObject,
+                       to newShape: Shape,
+                       absorbing history: ShapeHistoryRef,
+                       operationName: String) -> InteractiveObject?
+
     // MARK: - Selection
 
     /// What kinds of sub-shape can be selected.
@@ -88,13 +98,21 @@ public struct InteractiveObject: Hashable, Sendable {
 }
 
 /// A specific TopoDS_Face / TopoDS_Edge / TopoDS_Vertex inside a displayed shape,
-/// or the whole body. Survives shape mutation only as long as the topology indices
-/// are stable.
+/// or the whole body. `.face`/`.edge`/`.vertex` carry a `SubShapeRef` — the
+/// resolved `Shape`, a durable `TopologyGraph.GraphUID` when a graph was in
+/// hand at pick time, and the tessellation-time ordinal (render-path only,
+/// see "Selection survival across mutation" below).
 public enum SubShape: Hashable, Sendable {
     case body(InteractiveObject)
-    case face(InteractiveObject, faceIndex: Int)
-    case edge(InteractiveObject, edgeIndex: Int)
-    case vertex(InteractiveObject, vertexIndex: Int)
+    case face(InteractiveObject, ref: SubShapeRef)
+    case edge(InteractiveObject, ref: SubShapeRef)
+    case vertex(InteractiveObject, ref: SubShapeRef)
+}
+
+public struct SubShapeRef: Hashable, Sendable {
+    public let shape: Shape
+    public let uid: TopologyGraph.GraphUID?
+    public let ordinal: Int
 }
 
 /// Snapshot of selected sub-shapes.
@@ -205,11 +223,11 @@ OCCTSwiftViewport's `ViewportBody` already carries `faceIndices: [Int32]` (one p
 
 OCCTSwiftAIS's job:
 
-1. Maintain a registry: `[InteractiveObject.id: (Shape, ViewportBody)]`.
+1. Maintain a registry: `[InteractiveObject.id: (Shape, ViewportBody, TopologyGraph?, FaceIdentityTable?)]`.
 2. Subscribe to OCCTSwiftViewport's pick events (it already publishes `(bodyIndex, triangleIndex)` from the GPU pick).
-3. Look up the body's `faceIndices[triangleIndex]` to get the source face.
-4. Translate to `OCCTSwift.Shape.subShapes(ofType: .face)[faceIndex]` to get the `TopoDS_Face` handle.
-5. Wrap as a `SubShape.face(_, faceIndex:)` and feed into the selection state.
+3. Look up the body's `faceIndices[triangleIndex]` to get the source face ordinal.
+4. Resolve the ordinal to a `TopoDS_Face` handle via `OCCTSwiftTools.FaceIdentityTable.shape(forOrdinal:)` (captured at tessellation time) — **not** `OCCTSwift.Shape.subShapes(ofType: .face)[ordinal]`, which doesn't reliably agree with the render-path ordinal once a face is shared between shells (OCCTSwiftTools#42). Mint a `TopologyGraph.GraphUID` alongside via `FaceIdentityTable.uid(forOrdinal:)` when a graph is available.
+5. Wrap as a `SubShape.face(_, ref: SubShapeRef(shape:uid:ordinal:))` and feed into the selection state.
 
 For edges and vertices the pattern is similar but needs a separate buffer in `ViewportBody` — likely `edgeIndices` and `vertexIndices`. **Coordinate with OCCTSwiftViewport on adding those.** They probably belong in OCCTSwiftViewport (so the renderer knows about them) with `OCCTSwiftTools` populating them.
 
@@ -240,9 +258,16 @@ Likely path: add a small `DimensionLayer` to OCCTSwiftViewport that handles labe
 
 ### Selection survival across mutation
 
-Critical correctness concern: `SubShape.face(_, faceIndex: 7)` only means "face 7" while the `Shape` is unchanged. If the app boolean-unions or filets the shape, face indices renumber.
+Critical correctness concern: a render-path ordinal only means "face 7" while the exact `ViewportBody` it was minted from is unchanged — and even then, per OCCTSwiftTools#42, the tessellation ordinal doesn't reliably agree with `Shape.subShapes(ofType:)`'s deduplicated enumeration once a sub-shape is shared between shells.
 
-**Don't try to track this transparently in v0.x.** Document it. When OCCTSwift's `History` API is in scope (it is — see `BRepGraph_HistoryRecord`), expose `InteractiveContext.remap(selection:after:)` that takes a history and returns a remapped selection. That's a v0.4+ feature.
+**Resolved in #31 (v1.1.0)** via durable identity rather than index tracking:
+
+- `SubShapeRef` carries the resolved `Shape` (for geometry queries — no re-derivation from `ordinal` needed), an optional `TopologyGraph.GraphUID` (minted from a graph in hand at pick time — faces via `OCCTSwiftTools.FaceIdentityTable`, captured at tessellation time; edges/vertices minted directly since no identity table exists upstream for them yet — see [OCCTSwiftTools#43](https://github.com/SecondMouseAU/OCCTSwiftTools/issues/43)), and the tessellation-time `ordinal` (render-path only).
+- `InteractiveContext` builds a `TopologyGraph` per displayed object at `display(_:style:)` and retains that SAME instance across `update(_:to:absorbing:operationName:)` calls, absorbing each operation's history via `TopologyGraph.add(_:absorbing:inputRoots:operationName:)` — so `GraphUID`s minted before a mutation stay resolvable after it.
+- `InteractiveContext.remap(_:using:rebindingTo:)` resolves each sub-shape through its `uid` — `graph.node(forUID:)` (which rejects a uid from a different graph instance rather than resolving to a coincidentally-matching node) plus `graph.findDerivedOrSelf(of:)` — never through a stored index. A uid-less sub-shape (no graph was in hand at pick time) is dropped; there's nothing durable to resolve it by.
+- `InteractiveContext.isDeleted(_:in:)` distinguishes "the operation consumed this sub-shape" (`TopologyGraph.historyIsDeleted(_:)`) from "this wasn't selected" — `remap` alone can't, since both look like "absent from the result."
+
+See `Sources/OCCTSwiftAIS/Remap.swift` for the implementation and `Tests/OCCTSwiftAISTests/RemapTests.swift` / `InteractiveContextMutationTests.swift` for the split/delete/multi-shell-shared-face regression coverage.
 
 ### Async / concurrency
 

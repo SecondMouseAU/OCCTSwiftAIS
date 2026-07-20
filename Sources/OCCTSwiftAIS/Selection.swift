@@ -26,21 +26,21 @@ public struct Selection: Hashable, Sendable {
     }
 
     /// Concrete `Face` handles for any `.face(...)` entries. Order is unspecified.
-    /// Faces whose index no longer resolves on the source `Shape` are omitted.
+    /// Resolved directly from the ref's captured `Shape` — no ordinal round-trip
+    /// through `Shape.subShape(type:index:)` (see `SubShapeRef`'s documentation
+    /// for why that round-trip is unsafe).
     public var faces: [Face] {
         subshapes.compactMap { sub in
-            guard case .face(let obj, let idx) = sub else { return nil }
-            guard let faceShape = obj.shape.subShape(type: .face, index: idx) else { return nil }
-            return Face(faceShape)
+            guard case .face(_, let ref) = sub else { return nil }
+            return Face(ref.shape)
         }
     }
 
     /// Concrete `Edge` handles for any `.edge(...)` entries. Order is unspecified.
     public var edges: [Edge] {
         subshapes.compactMap { sub in
-            guard case .edge(let obj, let idx) = sub else { return nil }
-            guard let edgeShape = obj.shape.subShape(type: .edge, index: idx) else { return nil }
-            return Edge(edgeShape)
+            guard case .edge(_, let ref) = sub else { return nil }
+            return Edge(ref.shape)
         }
     }
 
@@ -49,8 +49,8 @@ public struct Selection: Hashable, Sendable {
     /// vertices as positional `SIMD3<Double>` values, not a `Vertex` class.
     public var vertices: [SIMD3<Double>] {
         subshapes.compactMap { sub in
-            guard case .vertex(let obj, let idx) = sub else { return nil }
-            return obj.shape.vertex(at: idx)
+            guard case .vertex(_, let ref) = sub else { return nil }
+            return ref.shape.vertices().first
         }
     }
 }

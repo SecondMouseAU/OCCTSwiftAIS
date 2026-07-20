@@ -12,8 +12,8 @@ The package is `import OCCTSwiftAIS` and depends transitively on `OCCTSwift`, `O
 
 ## Pages
 
-- [Selection](Selection.md) — `SelectionMode`, `Selection`, `SubShape`, `InteractiveObject`,
-  `RemapStrategy`.
+- [Selection](Selection.md) — `SelectionMode`, `Selection`, `SubShape`, `SubShapeRef`,
+  `InteractiveObject`.
 - [InteractiveContext](InteractiveContext.md) — the per-scene state object: display, selection
   mutation, styling, dimensions, and remap.
 - [Manipulators](Manipulators.md) — `ManipulatorWidget` (translate / rotate gizmo) and its SwiftUI
