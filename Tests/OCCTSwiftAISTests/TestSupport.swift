@@ -1,26 +1,30 @@
-import Testing
 import OCCTSwift
+import Testing
+
 @testable import OCCTSwiftAIS
 
-/// Test-only convenience: a `SubShapeRef` resolved directly from `object`'s
-/// shape at `index`, with no durable `uid` — for tests exercising geometry
+/// Test-only convenience: a `SubShapeRef` resolved directly from `object's`
+/// shape at `index`, with no durable `uid`, for tests exercising geometry
 /// resolution (dimension anchors, `Selection` accessors) that don't need a
 /// `BRepGraph` in the loop.
 func faceRef(_ object: InteractiveObject, _ index: Int) throws -> SubShapeRef {
-    SubShapeRef(shape: try #require(object.shape.subShape(type: .face, index: index)), ordinal: index)
+    SubShapeRef(
+        shape: try #require(object.shape.subShape(type: .face, index: index)), ordinal: index)
 }
 
 func edgeRef(_ object: InteractiveObject, _ index: Int) throws -> SubShapeRef {
-    SubShapeRef(shape: try #require(object.shape.subShape(type: .edge, index: index)), ordinal: index)
+    SubShapeRef(
+        shape: try #require(object.shape.subShape(type: .edge, index: index)), ordinal: index)
 }
 
 func vertexRef(_ object: InteractiveObject, _ index: Int) throws -> SubShapeRef {
-    SubShapeRef(shape: try #require(object.shape.subShape(type: .vertex, index: index)), ordinal: index)
+    SubShapeRef(
+        shape: try #require(object.shape.subShape(type: .vertex, index: index)), ordinal: index)
 }
 
 /// Test-only helpers for asserting against `SubShape`s produced by
 /// `InteractiveContext.handlePick`. These compare by render-path `ordinal`
-/// only, ignoring `SubShapeRef.uid` — tests assert against the ordinal the
+/// only, ignoring `SubShapeRef.uid`: tests assert against the ordinal the
 /// pick resolved to (the observable, renderer-visible outcome), not a durable
 /// uid they'd otherwise have to duplicate `InteractiveContext`'s own minting
 /// logic to reconstruct. See `SubShapeRef`'s equality docs for why a uid-less

@@ -1,7 +1,8 @@
-import Testing
-import simd
 import OCCTSwift
 import OCCTSwiftViewport
+import Testing
+import simd
+
 @testable import OCCTSwiftAIS
 
 @MainActor
@@ -25,11 +26,14 @@ struct ManipulatorWidgetTests {
 
     /// Project a world point to NDC xy using the suite's camera.
     private func ndc(of worldPoint: SIMD3<Float>) throws -> SIMD2<Float> {
-        let ndc3 = try #require(ProjectionUtility.worldToNDC(point: worldPoint, vpMatrix: vpMatrix()))
+        let ndc3 = try #require(
+            ProjectionUtility.worldToNDC(point: worldPoint, vpMatrix: vpMatrix()))
         return SIMD2<Float>(ndc3.x, ndc3.y)
     }
 
-    private func widgetBodies(_ ctx: InteractiveContext, target: InteractiveObject) -> [ViewportBody] {
+    private func widgetBodies(_ ctx: InteractiveContext, target: InteractiveObject)
+        -> [ViewportBody]
+    {
         let prefix = "ais.widget.\(target.id.uuidString)."
         return ctx.bodies.filter { $0.id.hasPrefix(prefix) }
     }
@@ -107,12 +111,13 @@ struct ManipulatorWidgetTests {
         let widget = ManipulatorWidget(target: obj)
         widget.size = 1.0
         widget.install(in: ctx)
-        let hit = widget.hitTest(ndc: SIMD2<Float>(0.95, -0.95), camera: Self.camera, aspect: Self.aspect)
+        let hit = widget.hitTest(
+            ndc: SIMD2<Float>(0.95, -0.95), camera: Self.camera, aspect: Self.aspect)
         #expect(hit == nil)
     }
 
     @Test func t_hitTest_beforeInstall_stillWorksAtIdentityPivot() throws {
-        // hitTest should not require install — it operates on the running pivot+transform.
+        // hitTest should not require install: it operates on the running pivot+transform.
         let ctx = makeContext()
         let obj = ctx.display(try makeBox())
         let widget = ManipulatorWidget(target: obj)
@@ -135,7 +140,7 @@ struct ManipulatorWidgetTests {
         // Round-trip: pick at origin (axis-line through origin), drag pick to where
         // world (0.5, 0, 0) projects → expected x translation ≈ 0.5.
         let startNDC = try ndc(of: .zero)
-        let endNDC   = try ndc(of: SIMD3<Float>(0.5, 0, 0))
+        let endNDC = try ndc(of: SIMD3<Float>(0.5, 0, 0))
 
         widget.beginDrag(axis: .x, ndc: startNDC, camera: Self.camera, aspect: Self.aspect)
         widget.updateDrag(ndc: endNDC, camera: Self.camera, aspect: Self.aspect)
@@ -157,14 +162,16 @@ struct ManipulatorWidgetTests {
 
         let initialT = arrowTransform(in: ctx, target: obj, axis: .x)
         let startNDC = try ndc(of: .zero)
-        let endNDC   = try ndc(of: SIMD3<Float>(1, 0, 0))
+        let endNDC = try ndc(of: SIMD3<Float>(1, 0, 0))
         widget.beginDrag(axis: .x, ndc: startNDC, camera: Self.camera, aspect: Self.aspect)
         widget.updateDrag(ndc: endNDC, camera: Self.camera, aspect: Self.aspect)
 
         let movedT = arrowTransform(in: ctx, target: obj, axis: .x)
         let initialTx = initialT?.columns.3.x ?? 0
         let movedTx = movedT?.columns.3.x ?? 0
-        #expect(movedTx > initialTx + 0.5, "expected the X arrow's body.transform to translate by ~drag delta on +X")
+        #expect(
+            movedTx > initialTx + 0.5,
+            "expected the X arrow's body.transform to translate by ~drag delta on +X")
     }
 
     @Test func t_snapTranslate_roundsDeltaToStep() throws {
@@ -176,7 +183,7 @@ struct ManipulatorWidgetTests {
         widget.install(in: ctx)
 
         let startNDC = try ndc(of: .zero)
-        let endNDC   = try ndc(of: SIMD3<Float>(0.7, 0, 0))   // closer to 0.75 than 0.5 with step 0.25
+        let endNDC = try ndc(of: SIMD3<Float>(0.7, 0, 0))  // closer to 0.75 than 0.5 with step 0.25
 
         widget.beginDrag(axis: .x, ndc: startNDC, camera: Self.camera, aspect: Self.aspect)
         widget.updateDrag(ndc: endNDC, camera: Self.camera, aspect: Self.aspect)
@@ -199,8 +206,10 @@ struct ManipulatorWidgetTests {
 
         let startNDC = try ndc(of: .zero)
         widget.beginDrag(axis: .x, ndc: startNDC, camera: Self.camera, aspect: Self.aspect)
-        widget.updateDrag(ndc: try ndc(of: SIMD3<Float>(0.3, 0, 0)), camera: Self.camera, aspect: Self.aspect)
-        widget.updateDrag(ndc: try ndc(of: SIMD3<Float>(0.6, 0, 0)), camera: Self.camera, aspect: Self.aspect)
+        widget.updateDrag(
+            ndc: try ndc(of: SIMD3<Float>(0.3, 0, 0)), camera: Self.camera, aspect: Self.aspect)
+        widget.updateDrag(
+            ndc: try ndc(of: SIMD3<Float>(0.6, 0, 0)), camera: Self.camera, aspect: Self.aspect)
         #expect(changeCount == 2)
     }
 
@@ -214,8 +223,10 @@ struct ManipulatorWidgetTests {
         var commits: [simd_float4x4] = []
         widget.onCommit = { commits.append($0) }
 
-        widget.beginDrag(axis: .y, ndc: try ndc(of: .zero), camera: Self.camera, aspect: Self.aspect)
-        widget.updateDrag(ndc: try ndc(of: SIMD3<Float>(0, 0.4, 0)), camera: Self.camera, aspect: Self.aspect)
+        widget.beginDrag(
+            axis: .y, ndc: try ndc(of: .zero), camera: Self.camera, aspect: Self.aspect)
+        widget.updateDrag(
+            ndc: try ndc(of: SIMD3<Float>(0, 0.4, 0)), camera: Self.camera, aspect: Self.aspect)
         widget.endDrag(commit: true)
 
         #expect(commits.count == 1)
@@ -234,8 +245,10 @@ struct ManipulatorWidgetTests {
         var commitCount = 0
         widget.onCommit = { _ in commitCount += 1 }
 
-        widget.beginDrag(axis: .x, ndc: try ndc(of: .zero), camera: Self.camera, aspect: Self.aspect)
-        widget.updateDrag(ndc: try ndc(of: SIMD3<Float>(0.4, 0, 0)), camera: Self.camera, aspect: Self.aspect)
+        widget.beginDrag(
+            axis: .x, ndc: try ndc(of: .zero), camera: Self.camera, aspect: Self.aspect)
+        widget.updateDrag(
+            ndc: try ndc(of: SIMD3<Float>(0.4, 0, 0)), camera: Self.camera, aspect: Self.aspect)
         widget.endDrag(commit: false)
 
         #expect(commitCount == 0)
@@ -247,8 +260,10 @@ struct ManipulatorWidgetTests {
         let widget = ManipulatorWidget(target: obj)
         widget.size = 2.0
         widget.install(in: ctx)
-        widget.beginDrag(axis: .x, ndc: try ndc(of: .zero), camera: Self.camera, aspect: Self.aspect)
-        widget.updateDrag(ndc: try ndc(of: SIMD3<Float>(0.4, 0, 0)), camera: Self.camera, aspect: Self.aspect)
+        widget.beginDrag(
+            axis: .x, ndc: try ndc(of: .zero), camera: Self.camera, aspect: Self.aspect)
+        widget.updateDrag(
+            ndc: try ndc(of: SIMD3<Float>(0.4, 0, 0)), camera: Self.camera, aspect: Self.aspect)
         widget.endDrag()
         widget.reset()
         #expect(widget.transform == matrix_identity_float4x4)
@@ -286,11 +301,15 @@ struct ManipulatorWidgetTests {
         let beforeT = ctx.sourceBody(for: obj)?.transform ?? matrix_identity_float4x4
         #expect(beforeT == matrix_identity_float4x4)
 
-        widget.beginDrag(axis: .x, ndc: try ndc(of: .zero), camera: Self.camera, aspect: Self.aspect)
-        widget.updateDrag(ndc: try ndc(of: SIMD3<Float>(0.5, 0, 0)), camera: Self.camera, aspect: Self.aspect)
+        widget.beginDrag(
+            axis: .x, ndc: try ndc(of: .zero), camera: Self.camera, aspect: Self.aspect)
+        widget.updateDrag(
+            ndc: try ndc(of: SIMD3<Float>(0.5, 0, 0)), camera: Self.camera, aspect: Self.aspect)
 
         let liveT = ctx.sourceBody(for: obj)?.transform ?? matrix_identity_float4x4
-        #expect(abs(liveT.columns.3.x - 0.5) < 1e-3, "target body transform should reflect running drag along +X")
+        #expect(
+            abs(liveT.columns.3.x - 0.5) < 1e-3,
+            "target body transform should reflect running drag along +X")
     }
 
     @Test func t_uninstall_restoresTargetBodyTransform() throws {
@@ -300,13 +319,17 @@ struct ManipulatorWidgetTests {
         widget.size = 2.0
         widget.install(in: ctx)
 
-        widget.beginDrag(axis: .x, ndc: try ndc(of: .zero), camera: Self.camera, aspect: Self.aspect)
-        widget.updateDrag(ndc: try ndc(of: SIMD3<Float>(0.5, 0, 0)), camera: Self.camera, aspect: Self.aspect)
+        widget.beginDrag(
+            axis: .x, ndc: try ndc(of: .zero), camera: Self.camera, aspect: Self.aspect)
+        widget.updateDrag(
+            ndc: try ndc(of: SIMD3<Float>(0.5, 0, 0)), camera: Self.camera, aspect: Self.aspect)
         widget.endDrag(commit: true)
         widget.uninstall()
 
         let restored = ctx.sourceBody(for: obj)?.transform ?? .init()
-        #expect(restored == matrix_identity_float4x4, "uninstall must restore target body's pre-install transform")
+        #expect(
+            restored == matrix_identity_float4x4,
+            "uninstall must restore target body's pre-install transform")
     }
 
     @Test func t_install_capturesPreExistingTargetTransform() throws {
@@ -314,10 +337,11 @@ struct ManipulatorWidgetTests {
         // should layer onto it, and uninstall should restore it.
         let ctx = makeContext()
         let obj = ctx.display(try makeBox())
-        let preInstall = simd_float4x4(SIMD4<Float>(1, 0, 0, 0),
-                                       SIMD4<Float>(0, 1, 0, 0),
-                                       SIMD4<Float>(0, 0, 1, 0),
-                                       SIMD4<Float>(7, 0, 0, 1))
+        let preInstall = simd_float4x4(
+            SIMD4<Float>(1, 0, 0, 0),
+            SIMD4<Float>(0, 1, 0, 0),
+            SIMD4<Float>(0, 0, 1, 0),
+            SIMD4<Float>(7, 0, 0, 1))
         if let i = ctx.bodies.firstIndex(where: { $0.id == "ais.\(obj.id.uuidString)" }) {
             ctx.bodies[i].transform = preInstall
         }
@@ -326,21 +350,29 @@ struct ManipulatorWidgetTests {
         widget.size = 2.0
         widget.install(in: ctx)
 
-        widget.beginDrag(axis: .x, ndc: try ndc(of: .zero), camera: Self.camera, aspect: Self.aspect)
-        widget.updateDrag(ndc: try ndc(of: SIMD3<Float>(0.5, 0, 0)), camera: Self.camera, aspect: Self.aspect)
+        widget.beginDrag(
+            axis: .x, ndc: try ndc(of: .zero), camera: Self.camera, aspect: Self.aspect)
+        widget.updateDrag(
+            ndc: try ndc(of: SIMD3<Float>(0.5, 0, 0)), camera: Self.camera, aspect: Self.aspect)
         widget.endDrag(commit: true)
 
         let live = ctx.sourceBody(for: obj)?.transform ?? .init()
-        #expect(abs(live.columns.3.x - 7.5) < 1e-3, "running drag should compose with the pre-install transform")
+        #expect(
+            abs(live.columns.3.x - 7.5) < 1e-3,
+            "running drag should compose with the pre-install transform")
 
         widget.uninstall()
         let restored = ctx.sourceBody(for: obj)?.transform ?? .init()
-        #expect(abs(restored.columns.3.x - 7.0) < 1e-3, "uninstall must restore exactly the pre-install transform")
+        #expect(
+            abs(restored.columns.3.x - 7.0) < 1e-3,
+            "uninstall must restore exactly the pre-install transform")
     }
 
     // MARK: - Helpers
 
-    private func arrowTransform(in ctx: InteractiveContext, target: InteractiveObject, axis: ManipulatorWidget.Axis) -> simd_float4x4? {
+    private func arrowTransform(
+        in ctx: InteractiveContext, target: InteractiveObject, axis: ManipulatorWidget.Axis
+    ) -> simd_float4x4? {
         let id = "ais.widget.\(target.id.uuidString).\(suffix(for: axis))"
         return ctx.bodies.first(where: { $0.id == id })?.transform
     }

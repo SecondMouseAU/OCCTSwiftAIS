@@ -1,7 +1,8 @@
-import Testing
-import simd
 import OCCTSwift
 import OCCTSwiftViewport
+import Testing
+import simd
+
 @testable import OCCTSwiftAIS
 
 @MainActor
@@ -26,7 +27,7 @@ struct LinearDimensionTests {
 
         let dim = LinearDimension(
             from: .vertex(obj, ref: try vertexRef(obj, 0)),
-            to:   .vertex(obj, ref: try vertexRef(obj, 1))
+            to: .vertex(obj, ref: try vertexRef(obj, 1))
         )
         let pts = dim.anchorPoints
         #expect(pts.count == 2)
@@ -39,7 +40,7 @@ struct LinearDimensionTests {
         let obj = ctx.display(try makeBox())
         let dim = LinearDimension(
             from: .vertex(obj, ref: try vertexRef(obj, 0)),
-            to:   .vertex(obj, ref: try vertexRef(obj, 6))  // diagonal corner of a box
+            to: .vertex(obj, ref: try vertexRef(obj, 6))  // diagonal corner of a box
         )
         let pts = dim.anchorPoints
         let expected = simd_distance(pts[0], pts[1])
@@ -52,13 +53,14 @@ struct LinearDimensionTests {
         // Two adjacent corners along the width axis (10 units).
         let dim = LinearDimension(
             from: .vertex(obj, ref: try vertexRef(obj, 0)),
-            to:   .vertex(obj, ref: try vertexRef(obj, 1))
+            to: .vertex(obj, ref: try vertexRef(obj, 1))
         )
         // dim.distance should be ~10 → label formatted with 1 decimal.
         let formatted = dim.label
         #expect(!formatted.isEmpty)
-        #expect(formatted == "10.0" || formatted == "5.00" || formatted == "3.00",
-                "expected an axis-aligned edge length, got \(formatted)")
+        #expect(
+            formatted == "10.0" || formatted == "5.00" || formatted == "3.00",
+            "expected an axis-aligned edge length, got \(formatted)")
     }
 
     @Test func t_customLabel_overridesFormatted() throws {
@@ -66,7 +68,7 @@ struct LinearDimensionTests {
         let obj = ctx.display(try makeBox())
         let dim = LinearDimension(
             from: .vertex(obj, ref: try vertexRef(obj, 0)),
-            to:   .vertex(obj, ref: try vertexRef(obj, 1)),
+            to: .vertex(obj, ref: try vertexRef(obj, 1)),
             customLabel: "WIDTH"
         )
         #expect(dim.label == "WIDTH")
@@ -87,7 +89,7 @@ struct LinearDimensionTests {
         )
         let dim = LinearDimension(
             from: .edge(obj, ref: try edgeRef(obj, 0)),
-            to:   .edge(obj, ref: try edgeRef(obj, 0))
+            to: .edge(obj, ref: try edgeRef(obj, 0))
         )
         let pts = dim.anchorPoints
         #expect(simd_distance(pts[0], expectedMid) < 1e-5)
@@ -100,15 +102,16 @@ struct LinearDimensionTests {
         let obj = ctx.display(try makeBox())
         let dim = LinearDimension(
             from: .face(obj, ref: try faceRef(obj, 0)),
-            to:   .face(obj, ref: try faceRef(obj, 1))
+            to: .face(obj, ref: try faceRef(obj, 1))
         )
         let pts = dim.anchorPoints
         // For a box, opposite faces' centers are separated by exactly one of
-        // the box dimensions (10, 5, or 3 — depending on which faces 0 / 1 are).
+        // the box dimensions (10, 5, or 3, depending on which faces 0 / 1 are).
         // Just verify the distance is one of the box's extents.
         let candidates: [Float] = [10, 5, 3]
-        #expect(candidates.contains { abs(dim.distance - $0) < 0.5 },
-                "face-to-face distance \(dim.distance) should match a box dimension")
+        #expect(
+            candidates.contains { abs(dim.distance - $0) < 0.5 },
+            "face-to-face distance \(dim.distance) should match a box dimension")
         _ = pts
     }
 
@@ -123,7 +126,7 @@ struct LinearDimensionTests {
         )
         let dim = LinearDimension(
             from: .body(obj),
-            to:   .body(obj)
+            to: .body(obj)
         )
         let pts = dim.anchorPoints
         #expect(simd_distance(pts[0], expected) < 1e-5)
@@ -134,7 +137,7 @@ struct LinearDimensionTests {
 
     @Test func t_planeProjection_anchorsLandOnPlane_andDistanceShrinks() throws {
         // Find a pair of box vertices with significantly different Z so that
-        // projection onto Z=0 actually changes the distance — OCCT's vertex
+        // projection onto Z=0 actually changes the distance; OCCT's vertex
         // enumeration order isn't load-bearing on the test.
         let ctx = makeContext()
         let shape = try #require(OCCTSwift.Shape.box(width: 6, height: 4, depth: 8))
@@ -145,7 +148,8 @@ struct LinearDimensionTests {
         outer: for i in 0..<obj.shape.vertexCount {
             for j in (i + 1)..<obj.shape.vertexCount {
                 guard let pi = obj.shape.vertex(at: i),
-                      let pj = obj.shape.vertex(at: j) else { continue }
+                    let pj = obj.shape.vertex(at: j)
+                else { continue }
                 if abs(pi.z - pj.z) > 1.0 {
                     pickedPair = (i, j)
                     break outer
@@ -156,11 +160,11 @@ struct LinearDimensionTests {
 
         let unprojected = LinearDimension(
             from: .vertex(obj, ref: try vertexRef(obj, a)),
-            to:   .vertex(obj, ref: try vertexRef(obj, b))
+            to: .vertex(obj, ref: try vertexRef(obj, b))
         )
         let projected = LinearDimension(
             from: .vertex(obj, ref: try vertexRef(obj, a)),
-            to:   .vertex(obj, ref: try vertexRef(obj, b)),
+            to: .vertex(obj, ref: try vertexRef(obj, b)),
             plane: plane
         )
 
@@ -190,7 +194,7 @@ struct LinearDimensionTests {
         let obj = ctx.display(try makeBox())
         let dim = LinearDimension(
             from: .vertex(obj, ref: try vertexRef(obj, 0)),
-            to:   .vertex(obj, ref: try vertexRef(obj, 1))
+            to: .vertex(obj, ref: try vertexRef(obj, 1))
         )
         ctx.add(dim)
         #expect(ctx.viewport.measurements.count == 1)
@@ -203,7 +207,7 @@ struct LinearDimensionTests {
         let obj = ctx.display(try makeBox())
         let dim = LinearDimension(
             from: .vertex(obj, ref: try vertexRef(obj, 0)),
-            to:   .vertex(obj, ref: try vertexRef(obj, 1))
+            to: .vertex(obj, ref: try vertexRef(obj, 1))
         )
         ctx.add(dim)
         ctx.add(dim)
@@ -217,7 +221,7 @@ struct LinearDimensionTests {
         let obj = ctx.display(try makeBox())
         let dim = LinearDimension(
             from: .vertex(obj, ref: try vertexRef(obj, 0)),
-            to:   .vertex(obj, ref: try vertexRef(obj, 1))
+            to: .vertex(obj, ref: try vertexRef(obj, 1))
         )
         ctx.add(dim)
         ctx.remove(dim)
@@ -228,9 +232,14 @@ struct LinearDimensionTests {
     @Test func t_removeAll_dropsDimensionsToo() throws {
         let ctx = makeContext()
         let obj = ctx.display(try makeBox())
-        let a = LinearDimension(from: .vertex(obj, ref: try vertexRef(obj, 0)), to: .vertex(obj, ref: try vertexRef(obj, 1)))
-        let b = LinearDimension(from: .vertex(obj, ref: try vertexRef(obj, 2)), to: .vertex(obj, ref: try vertexRef(obj, 3)))
-        ctx.add(a); ctx.add(b)
+        let a = LinearDimension(
+            from: .vertex(obj, ref: try vertexRef(obj, 0)),
+            to: .vertex(obj, ref: try vertexRef(obj, 1)))
+        let b = LinearDimension(
+            from: .vertex(obj, ref: try vertexRef(obj, 2)),
+            to: .vertex(obj, ref: try vertexRef(obj, 3)))
+        ctx.add(a)
+        ctx.add(b)
         #expect(ctx.viewport.measurements.count == 2)
         ctx.removeAll()
         #expect(ctx.viewport.measurements.isEmpty)
@@ -242,7 +251,7 @@ struct LinearDimensionTests {
         let obj = ctx.display(try makeBox())
         let dim = LinearDimension(
             from: .vertex(obj, ref: try vertexRef(obj, 0)),
-            to:   .vertex(obj, ref: try vertexRef(obj, 1)),
+            to: .vertex(obj, ref: try vertexRef(obj, 1)),
             customLabel: "before"
         )
         ctx.add(dim)
@@ -263,7 +272,7 @@ struct LinearDimensionTests {
         let obj = ctx.display(try makeBox())
         let dim = LinearDimension(
             from: .vertex(obj, ref: try vertexRef(obj, 0)),
-            to:   .vertex(obj, ref: try vertexRef(obj, 1))
+            to: .vertex(obj, ref: try vertexRef(obj, 1))
         )
         if case .distance(let m) = dim.viewportMeasurement {
             #expect(m.id == dim.id)

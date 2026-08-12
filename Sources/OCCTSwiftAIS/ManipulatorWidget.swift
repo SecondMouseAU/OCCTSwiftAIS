@@ -1,15 +1,17 @@
 import Foundation
-import simd
 import OCCTSwift
 import OCCTSwiftViewport
+import simd
 
 /// Three-axis manipulator gizmo for translating (`v0.2`) or rotating (`v0.2.2`)
-/// a target `InteractiveObject`. Scaling is reserved for a future release.
+/// a target `InteractiveObject`.
+///
+/// Scaling is reserved for a future release.
 ///
 /// ## Wiring
 ///
 /// 1. Build the widget for a target `InteractiveObject` and pick a `mode`.
-/// 2. Call `install(in:)` with the `InteractiveContext` displaying the target —
+/// 2. Call `install(in:)` with the `InteractiveContext` displaying the target:
 ///    three axis-arrow bodies (`.translate`) or three ring bodies (`.rotate`)
 ///    appear in the scene, tagged `ais.widget.<UUID>.<x|y|z>`.
 /// 3. From your gesture handler, call `hitTest(ndc:camera:aspect:)` to see which
@@ -19,7 +21,7 @@ import OCCTSwiftViewport
 ///
 /// Widget bodies render on the viewport's overlay layer (always on top) and
 /// their picks route to `viewport.widgetPickResult` rather than the user pick
-/// stream — see `ViewportBody.renderLayer` / `pickLayer`.
+/// stream; see `ViewportBody.renderLayer` / `pickLayer`.
 ///
 /// During drag, the target body's `ViewportBody.transform` is updated live
 /// (`preInstallTransform * widget.transform`) so the user sees their input on
@@ -30,7 +32,7 @@ public final class ManipulatorWidget: ObservableObject {
     public enum Mode: Sendable {
         case translate
         case rotate
-        case scale     // reserved
+        case scale  // reserved
     }
 
     public enum Axis: Hashable, Sendable, CaseIterable {
@@ -66,31 +68,39 @@ public final class ManipulatorWidget: ObservableObject {
     public let target: InteractiveObject
     public let mode: Mode
 
-    /// Length of each arrow / radius reference for rings. Pick relative to your
-    /// target's bounding box. Defaults to `1.0`.
+    /// Length of each arrow / radius reference for rings.
+    ///
+    /// Pick relative to your target's bounding box. Defaults to `1.0`.
     public var size: Float = 1.0
 
     /// Arrow shaft radius in world units (translate mode).
     public var shaftRadius: Float = 0.025
 
-    /// Rotation ring tube radius in world units (rotate mode). Defaults to
-    /// `shaftRadius * 1.2` if left at `nil`.
+    /// Rotation ring tube radius in world units (rotate mode).
+    ///
+    /// Defaults to `shaftRadius * 1.2` if left at `nil`.
     public var rotateTubeRadius: Float?
 
-    /// Rotation ring major radius in world units (rotate mode). Defaults to
-    /// `size * 0.85` if left at `nil`.
+    /// Rotation ring major radius in world units (rotate mode).
+    ///
+    /// Defaults to `size * 0.85` if left at `nil`.
     public var rotateRingRadius: Float?
 
-    /// Hit-test threshold in NDC units (translate mode). Default `0.04`.
+    /// Hit-test threshold in NDC units (translate mode).
+    ///
+    /// Default `0.04`.
     public var hitNDCTolerance: Float = 0.04
 
     /// Hit-test threshold for ring radius (rotate mode), in world units.
+    ///
     /// Defaults to `2.5 × rotateTubeRadius`.
     public var rotateHitTolerance: Float?
 
     /// Minimum |cos(angle)| between view direction and a ring's normal for the
-    /// ring to be hit-testable. Below this the plane intersection becomes
-    /// numerically unstable; the axis is skipped. Default `0.05`.
+    /// ring to be hit-testable.
+    ///
+    /// Below this the plane intersection becomes numerically unstable; the
+    /// axis is skipped. Default `0.05`.
     public var rotateAxisDotMin: Float = 0.05
 
     public var snapTranslate: Float?
@@ -107,10 +117,11 @@ public final class ManipulatorWidget: ObservableObject {
 
     public var isDragging: Bool { activeAxis != nil }
 
-    /// The `InteractiveContext` this widget is currently installed in, or `nil`
-    /// before `install(in:)` and after `uninstall()`. Public read so the
-    /// `.attachManipulator(_:)` view modifier can route camera-fallback drags
-    /// through the same context's `viewport`.
+    /// The `InteractiveContext` this widget is currently installed in, or
+    /// `nil` before `install(in:)` and after `uninstall()`.
+    ///
+    /// Public read so the `.attachManipulator(_:)` view modifier can route
+    /// camera-fallback drags through the same context's `viewport`.
     public weak private(set) var context: InteractiveContext?
 
     // MARK: - Internal state
@@ -125,7 +136,7 @@ public final class ManipulatorWidget: ObservableObject {
         var axis: Axis {
             switch self {
             case .translate(let a, _, _): return a
-            case .rotate(let a, _, _):    return a
+            case .rotate(let a, _, _): return a
             }
         }
     }
@@ -144,7 +155,8 @@ public final class ManipulatorWidget: ObservableObject {
         guard !isInstalled else { return }
         self.context = context
         self.pivot = computePivot(in: context) ?? .zero
-        self.preInstallTargetTransform = context.sourceBody(for: target)?.transform
+        self.preInstallTargetTransform =
+            context.sourceBody(for: target)?.transform
             ?? matrix_identity_float4x4
         buildHandleBodies()
         applyHandleTransforms()
@@ -161,7 +173,8 @@ public final class ManipulatorWidget: ObservableObject {
         let prefix = bodyIDPrefix
         context.removeInternalBodies { $0.hasPrefix(prefix) }
         if let targetID = context.bodyID(for: target),
-           let i = context.bodies.firstIndex(where: { $0.id == targetID }) {
+            let i = context.bodies.firstIndex(where: { $0.id == targetID })
+        {
             context.bodies[i].transform = preInstallTargetTransform
         }
         self.context = nil
@@ -174,9 +187,9 @@ public final class ManipulatorWidget: ObservableObject {
 
     public func hitTest(ndc: SIMD2<Float>, camera: CameraState, aspect: Float) -> Axis? {
         switch mode {
-        case .translate:    return hitTestTranslate(ndc: ndc, camera: camera, aspect: aspect)
-        case .rotate:       return hitTestRotate(ndc: ndc, camera: camera, aspect: aspect)
-        case .scale:        return nil
+        case .translate: return hitTestTranslate(ndc: ndc, camera: camera, aspect: aspect)
+        case .rotate: return hitTestRotate(ndc: ndc, camera: camera, aspect: aspect)
+        case .scale: return nil
         }
     }
 
@@ -197,11 +210,13 @@ public final class ManipulatorWidget: ObservableObject {
         guard let state = dragState else { return }
         switch state {
         case .translate(let axis, let initialParam, let initialTransform):
-            updateTranslateDrag(axis: axis, initialParam: initialParam, initialTransform: initialTransform,
-                                ndc: ndc, camera: camera, aspect: aspect)
+            updateTranslateDrag(
+                axis: axis, initialParam: initialParam, initialTransform: initialTransform,
+                ndc: ndc, camera: camera, aspect: aspect)
         case .rotate(let axis, let initialAngle, let initialTransform):
-            updateRotateDrag(axis: axis, initialAngle: initialAngle, initialTransform: initialTransform,
-                             ndc: ndc, camera: camera, aspect: aspect)
+            updateRotateDrag(
+                axis: axis, initialAngle: initialAngle, initialTransform: initialTransform,
+                ndc: ndc, camera: camera, aspect: aspect)
         }
     }
 
@@ -232,7 +247,8 @@ public final class ManipulatorWidget: ObservableObject {
         for axis in Axis.allCases {
             let endWS = originWS + axis.direction * size
             guard let p0 = ProjectionUtility.worldToNDC(point: originWS, vpMatrix: viewProj),
-                  let p1 = ProjectionUtility.worldToNDC(point: endWS,    vpMatrix: viewProj) else {
+                let p1 = ProjectionUtility.worldToNDC(point: endWS, vpMatrix: viewProj)
+            else {
                 continue
             }
             let p0xy = SIMD2<Float>(p0.x, p0.y)
@@ -249,10 +265,14 @@ public final class ManipulatorWidget: ObservableObject {
         return best?.axis
     }
 
-    private func beginTranslateDrag(axis: Axis, ndc: SIMD2<Float>, camera: CameraState, aspect: Float) {
+    private func beginTranslateDrag(
+        axis: Axis, ndc: SIMD2<Float>, camera: CameraState, aspect: Float
+    ) {
         let pickRay = Ray.fromCamera(ndc: ndc, cameraState: camera, aspectRatio: aspect)
         let originWS = pivot + currentTranslation()
-        guard let initial = closestParam(onAxisLine: originWS, axisDir: axis.direction, ray: pickRay) else {
+        guard
+            let initial = closestParam(onAxisLine: originWS, axisDir: axis.direction, ray: pickRay)
+        else {
             return
         }
         dragState = .translate(axis: axis, initialAxisParam: initial, initialTransform: transform)
@@ -269,7 +289,8 @@ public final class ManipulatorWidget: ObservableObject {
     ) {
         let pickRay = Ray.fromCamera(ndc: ndc, cameraState: camera, aspectRatio: aspect)
         let originWS = pivot + extractTranslation(from: initialTransform)
-        guard let now = closestParam(onAxisLine: originWS, axisDir: axis.direction, ray: pickRay) else {
+        guard let now = closestParam(onAxisLine: originWS, axisDir: axis.direction, ray: pickRay)
+        else {
             return
         }
         var delta = now - initialParam
@@ -307,7 +328,8 @@ public final class ManipulatorWidget: ObservableObject {
         return best?.axis
     }
 
-    private func beginRotateDrag(axis: Axis, ndc: SIMD2<Float>, camera: CameraState, aspect: Float) {
+    private func beginRotateDrag(axis: Axis, ndc: SIMD2<Float>, camera: CameraState, aspect: Float)
+    {
         let pickRay = Ray.fromCamera(ndc: ndc, cameraState: camera, aspectRatio: aspect)
         guard let intersect = ringPlaneIntersection(axis: axis, ray: pickRay) else { return }
         let initialAngle = ringPlaneAngle(point: intersect, axis: axis)
@@ -332,16 +354,18 @@ public final class ManipulatorWidget: ObservableObject {
             delta = (delta / step).rounded() * step
         }
         let q = simd_quatf(angle: delta, axis: simd_normalize(axis.direction))
-        let R = simd_float4x4(q)
-        let M = translationMatrix(pivot) * R * translationMatrix(-pivot)
-        transform = initialTransform * M
+        let rotation = simd_float4x4(q)
+        let rotateAboutPivot = translationMatrix(pivot) * rotation * translationMatrix(-pivot)
+        transform = initialTransform * rotateAboutPivot
         applyHandleTransforms()
         applyTargetTransform()
         onChange?(transform)
     }
 
     /// Where the ray crosses the ring plane (perpendicular to `axis` through
-    /// the pivot). Nil if the ray is too parallel to the plane to be useful.
+    /// the pivot).
+    ///
+    /// Nil if the ray is too parallel to the plane to be useful.
     private func ringPlaneIntersection(axis: Axis, ray: Ray) -> SIMD3<Float>? {
         let n = simd_normalize(axis.direction)
         let denom = simd_dot(ray.direction, n)
@@ -352,6 +376,7 @@ public final class ManipulatorWidget: ObservableObject {
     }
 
     /// Angle of a point in the ring plane relative to the in-plane basis.
+    ///
     /// Stable across calls for the same axis.
     private func ringPlaneAngle(point: SIMD3<Float>, axis: Axis) -> Float {
         let (u, v) = ringPlaneBasis(for: axis)
@@ -407,8 +432,10 @@ public final class ManipulatorWidget: ObservableObject {
     }
 
     /// Translate handles to the pivot and (in translate mode) by the running
-    /// translation. Rings stay anchored at the pivot — they don't rotate to
-    /// avoid losing the visual reference of the rotation axes.
+    /// translation.
+    ///
+    /// Rings stay anchored at the pivot: they don't rotate to avoid losing
+    /// the visual reference of the rotation axes.
     private func applyHandleTransforms() {
         guard let context else { return }
         let m: simd_float4x4
@@ -468,7 +495,7 @@ private func extractTranslation(from m: simd_float4x4) -> SIMD3<Float> {
 
 private func centerOfVertexData(_ data: [Float], stride: Int) -> SIMD3<Float>? {
     guard data.count >= stride else { return nil }
-    var minP = SIMD3<Float>(repeating:  .infinity)
+    var minP = SIMD3<Float>(repeating: .infinity)
     var maxP = SIMD3<Float>(repeating: -.infinity)
     var i = 0
     while i + 2 < data.count {
@@ -480,7 +507,8 @@ private func centerOfVertexData(_ data: [Float], stride: Int) -> SIMD3<Float>? {
     return (minP + maxP) * 0.5
 }
 
-private func pointToSegmentDistance(point: SIMD2<Float>, a: SIMD2<Float>, b: SIMD2<Float>) -> Float {
+private func pointToSegmentDistance(point: SIMD2<Float>, a: SIMD2<Float>, b: SIMD2<Float>) -> Float
+{
     let ab = b - a
     let denom = simd_dot(ab, ab)
     if denom < 1e-9 { return simd_distance(point, a) }
@@ -509,7 +537,7 @@ private func closestParam(
 /// Wrap to (-π, π] so a drag that crosses the ±π seam doesn't jump 2π.
 private func wrapAngle(_ a: Float) -> Float {
     var x = a
-    while x >  .pi { x -= 2 * .pi }
+    while x > .pi { x -= 2 * .pi }
     while x <= -.pi { x += 2 * .pi }
     return x
 }

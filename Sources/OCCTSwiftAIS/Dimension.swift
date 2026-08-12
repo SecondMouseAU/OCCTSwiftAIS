@@ -1,11 +1,13 @@
 import Foundation
-import simd
 import OCCTSwift
 import OCCTSwiftViewport
+import simd
 
-/// A dimension annotation — a measurement displayed in the scene as leader
-/// lines plus a billboarded label. Concrete subclasses: `LinearDimension`
-/// (v0.4); `AngularDimension` and `RadialDimension` come in v0.5.
+/// A dimension annotation: a measurement displayed in the scene as leader
+/// lines plus a billboarded label.
+///
+/// Concrete subclasses: `LinearDimension` (v0.4); `AngularDimension` and
+/// `RadialDimension` come in v0.5.
 ///
 /// Dimensions render via the `MeasurementOverlay` SwiftUI Canvas overlay
 /// inside `MetalViewportView`. AIS owns the topology-aware anchor resolution
@@ -36,7 +38,7 @@ public final class LinearDimension: Dimension, @unchecked Sendable {
     public let to: SubShape
 
     /// If non-nil, both anchors are orthogonally projected onto this plane
-    /// before the distance is measured — the dimension reports the **in-plane**
+    /// before the distance is measured: the dimension reports the **in-plane**
     /// length rather than the straight 3D distance.
     public let plane: WorkPlane?
 
@@ -61,7 +63,9 @@ public final class LinearDimension: Dimension, @unchecked Sendable {
         let a = DimensionAnchor.resolve(from)
         let b = DimensionAnchor.resolve(to)
         if let plane {
-            return [DimensionAnchor.project(a, onto: plane), DimensionAnchor.project(b, onto: plane)]
+            return [
+                DimensionAnchor.project(a, onto: plane), DimensionAnchor.project(b, onto: plane),
+            ]
         }
         return [a, b]
     }
@@ -82,7 +86,7 @@ public final class LinearDimension: Dimension, @unchecked Sendable {
     public var viewportMeasurement: ViewportMeasurement {
         let pts = anchorPoints
         let start = pts.indices.contains(0) ? pts[0] : .zero
-        let end   = pts.indices.contains(1) ? pts[1] : .zero
+        let end = pts.indices.contains(1) ? pts[1] : .zero
         return .distance(DistanceMeasurement(id: id, start: start, end: end, label: customLabel))
     }
 }
@@ -110,15 +114,19 @@ public final class AngularDimension: Dimension, @unchecked Sendable {
         self.customLabel = customLabel
     }
 
-    /// `[armA, apex, armB]` — preserves the standard "vertex in the middle"
+    /// `[armA, apex, armB]`: preserves the standard "vertex in the middle"
     /// convention that `ViewportMeasurement.angle` and most CAD apps expect.
     public var anchorPoints: [SIMD3<Float>] {
-        [DimensionAnchor.resolve(armA),
-         DimensionAnchor.resolve(apex),
-         DimensionAnchor.resolve(armB)]
+        [
+            DimensionAnchor.resolve(armA),
+            DimensionAnchor.resolve(apex),
+            DimensionAnchor.resolve(armB),
+        ]
     }
 
-    /// Angle at the apex, in degrees. NaN if either arm coincides with the apex.
+    /// Angle at the apex, in degrees.
+    ///
+    /// NaN if either arm coincides with the apex.
     public var degrees: Float {
         let pts = anchorPoints
         guard pts.count == 3 else { return .nan }
@@ -165,8 +173,10 @@ public final class RadialDimension: Dimension, @unchecked Sendable {
         self.customLabel = customLabel
     }
 
-    /// `[center, pointOnEdge]`. Returns `[.zero, .zero]` when the sub-shape
-    /// isn't an edge or its underlying curve isn't circular.
+    /// `[center, pointOnEdge]`.
+    ///
+    /// Returns `[.zero, .zero]` when the sub-shape isn't an edge or its
+    /// underlying curve isn't circular.
     public var anchorPoints: [SIMD3<Float>] {
         guard let (center, edgePoint, _) = DimensionAnchor.resolveCircle(circularEdge) else {
             return [.zero, .zero]
@@ -191,20 +201,23 @@ public final class RadialDimension: Dimension, @unchecked Sendable {
     public var viewportMeasurement: ViewportMeasurement {
         let pts = anchorPoints
         let center = pts.indices.contains(0) ? pts[0] : .zero
-        let edge   = pts.indices.contains(1) ? pts[1] : .zero
-        return .radius(RadiusMeasurement(
-            id: id,
-            center: center,
-            edgePoint: edge,
-            showDiameter: showDiameter,
-            label: customLabel
-        ))
+        let edge = pts.indices.contains(1) ? pts[1] : .zero
+        return .radius(
+            RadiusMeasurement(
+                id: id,
+                center: center,
+                edgePoint: edge,
+                showDiameter: showDiameter,
+                label: customLabel
+            ))
     }
 }
 
 // MARK: - Anchor resolution
 
-/// Maps a `SubShape` to a world-space anchor point. Used by dimension types.
+/// Maps a `SubShape` to a world-space anchor point.
+///
+/// Used by dimension types.
 enum DimensionAnchor {
 
     static func resolve(_ subshape: SubShape) -> SIMD3<Float> {
@@ -228,7 +241,7 @@ enum DimensionAnchor {
     }
 
     private static func resolveFace(_ ref: SubShapeRef) -> SIMD3<Float> {
-        // Bbox center of the face — cheap, robust for axis-aligned faces.
+        // Bbox center of the face: cheap, robust for axis-aligned faces.
         // Curved faces would be better served by the area-weighted centroid
         // (`ShapeMeasurements.faceCentroids` from OCCTSwift) but that's an
         // O(faces) computation; bbox center is constant time per face.
@@ -250,19 +263,22 @@ enum DimensionAnchor {
         return SIMD3<Float>(Float(p.x), Float(p.y), Float(p.z))
     }
 
-    /// If `subshape` is a circular edge, return `(center, pointOnCircle, radius)`
-    /// in world space. The `pointOnCircle` is the edge's start endpoint —
-    /// guaranteed to lie on the circle when the edge is a circular arc /
-    /// closed circle.
+    /// If `subshape` is a circular edge, return
+    /// `(center, pointOnCircle, radius)` in world space.
+    ///
+    /// The `pointOnCircle` is the edge's start endpoint, guaranteed to lie
+    /// on the circle when the edge is a circular arc / closed circle.
     static func resolveCircle(_ subshape: SubShape) -> (SIMD3<Float>, SIMD3<Float>, Float)? {
         guard case .edge(_, let ref) = subshape,
-              let edge = OCCTSwift.Edge(ref.shape),
-              edge.isCircle,
-              let curve = edge.curve3D else {
+            let edge = OCCTSwift.Edge(ref.shape),
+            edge.isCircle,
+            let curve = edge.curve3D
+        else {
             return nil
         }
         let props = curve.circleProperties
-        let center = SIMD3<Float>(Float(props.center.x), Float(props.center.y), Float(props.center.z))
+        let center = SIMD3<Float>(
+            Float(props.center.x), Float(props.center.y), Float(props.center.z))
         let radius = Float(props.radius)
         let edgePoint = SIMD3<Float>(
             Float(edge.endpoints.start.x),
@@ -295,14 +311,16 @@ enum DimensionAnchor {
 
 extension InteractiveContext {
 
-    /// Add a dimension to the scene. The dimension's `viewportMeasurement` is
-    /// pushed to `viewport.measurements`, where the renderer's overlay picks
-    /// it up automatically. Idempotent for the same instance.
+    /// Add a dimension to the scene.
+    ///
+    /// The dimension's `viewportMeasurement` is pushed to
+    /// `viewport.measurements`, where the renderer's overlay picks it up
+    /// automatically. Idempotent for the same instance.
     @discardableResult
     public func add<D: Dimension>(_ dimension: D) -> D {
         let oid = ObjectIdentifier(dimension)
         if dimensionRegistry[oid] != nil {
-            // Already added — refresh the measurement in case anchors changed.
+            // Already added: refresh the measurement in case anchors changed.
             refreshDimensionMeasurement(dimension)
             return dimension
         }
@@ -325,8 +343,10 @@ extension InteractiveContext {
     }
 
     /// Re-fetch a dimension's `viewportMeasurement` and replace it in place
-    /// in `viewport.measurements`. Call this if the underlying anchors moved
-    /// (e.g. a target shape mutated) — for a static scene you don't need it.
+    /// in `viewport.measurements`.
+    ///
+    /// Call this if the underlying anchors moved (e.g. a target shape
+    /// mutated); for a static scene you don't need it.
     public func refreshDimensionMeasurement(_ dimension: any Dimension) {
         let id = dimension.id
         if let i = viewport.measurements.firstIndex(where: { $0.id == id }) {

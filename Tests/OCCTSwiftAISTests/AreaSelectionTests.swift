@@ -1,8 +1,9 @@
-import Testing
 import Foundation
-import simd
 import OCCTSwift
 import OCCTSwiftViewport
+import Testing
+import simd
+
 @testable import OCCTSwiftAIS
 
 @MainActor
@@ -23,7 +24,8 @@ struct AreaSelectionTests {
 
     private func vpMatrix(_ ctx: InteractiveContext) -> simd_float4x4 {
         let camera = ctx.viewport.cameraState
-        return camera.projectionMatrix(aspectRatio: ctx.viewport.lastAspectRatio) * camera.viewMatrix
+        return camera.projectionMatrix(aspectRatio: ctx.viewport.lastAspectRatio)
+            * camera.viewMatrix
     }
 
     private func screenPoints(for shape: Shape, ctx: InteractiveContext) -> [CGPoint] {
@@ -36,9 +38,11 @@ struct AreaSelectionTests {
         }
     }
 
-    /// Bounding rect (in screen space) of `shape`'s own projected vertices,
+    /// Bounding rect (in screen space) of `shape's` own projected vertices,
     /// padded outward slightly so floating-point edges land safely inside.
-    private func screenRect(for shape: Shape, ctx: InteractiveContext, padding: CGFloat = 4) throws -> CGRect {
+    private func screenRect(for shape: Shape, ctx: InteractiveContext, padding: CGFloat = 4) throws
+        -> CGRect
+    {
         let points = screenPoints(for: shape, ctx: ctx)
         let minX = try #require(points.map(\.x).min()) - padding
         let maxX = try #require(points.map(\.x).max()) + padding
@@ -163,7 +167,9 @@ struct AreaSelectionTests {
             mode: .enclosed, viewportSize: viewportSize
         )
 
-        #expect(ctx.selection.isEmpty, "an installed filter should gate area selection exactly as it gates a point pick")
+        #expect(
+            ctx.selection.isEmpty,
+            "an installed filter should gate area selection exactly as it gates a point pick")
     }
 
     // MARK: - SelectionScheme
@@ -214,9 +220,12 @@ struct AreaSelectionTests {
         let face0Shape = try #require(Shape.fromFace(faces[0]))
         // Select via the SAME uid the area-select match will (re)mint, so
         // `.remove`'s Set-subtraction actually cancels it (SubShapeRef
-        // equality follows uid, not shape/ordinal alone — see its docs).
+        // equality follows uid, not shape/ordinal alone; see its docs).
         let table = try #require(ctx.faceIdentityTable(for: obj))
-        ctx.select(.face(obj, ref: SubShapeRef(shape: face0Shape, uid: table.uid(forOrdinal: 0), ordinal: 0)))
+        ctx.select(
+            .face(
+                obj, ref: SubShapeRef(shape: face0Shape, uid: table.uid(forOrdinal: 0), ordinal: 0))
+        )
 
         let rect = try screenRect(for: face0Shape, ctx: ctx)
         ctx.selectRectangle(
@@ -234,7 +243,10 @@ struct AreaSelectionTests {
         let faces = obj.shape.faces()
         let face0Shape = try #require(Shape.fromFace(faces[0]))
         let table = try #require(ctx.faceIdentityTable(for: obj))
-        ctx.select(.face(obj, ref: SubShapeRef(shape: face0Shape, uid: table.uid(forOrdinal: 0), ordinal: 0)))
+        ctx.select(
+            .face(
+                obj, ref: SubShapeRef(shape: face0Shape, uid: table.uid(forOrdinal: 0), ordinal: 0))
+        )
 
         let rect = try screenRect(for: face0Shape, ctx: ctx)
         ctx.selectRectangle(
@@ -242,7 +254,9 @@ struct AreaSelectionTests {
             mode: .enclosed, scheme: .xor, viewportSize: viewportSize
         )
 
-        #expect(!containsFace(ctx.selection.subshapes, obj, ordinal: 0), "xor should toggle off an already-selected face")
+        #expect(
+            !containsFace(ctx.selection.subshapes, obj, ordinal: 0),
+            "xor should toggle off an already-selected face")
     }
 
     // MARK: - Lasso (selectPolygon)
@@ -278,7 +292,9 @@ struct AreaSelectionTests {
 
     // MARK: - Gesture coordinator: navigate mode doesn't fight camera orbit
 
-    @Test func t_gestureCoordinator_navigateMode_forwardsToViewportOrbit_leavesSelectionAlone() throws {
+    @Test func t_gestureCoordinator_navigateMode_forwardsToViewportOrbit_leavesSelectionAlone()
+        throws
+    {
         let ctx = makeContext()
         let obj = ctx.display(try makeBox())
         ctx.select(.body(obj))
@@ -293,7 +309,7 @@ struct AreaSelectionTests {
         )
         coordinator.onEnded()
 
-        // Navigate mode must not touch selection at all — it only drives the camera.
+        // Navigate mode must not touch selection at all: it only drives the camera.
         #expect(ctx.selection.subshapes == [.body(obj)])
         _ = beforeCamera
     }
@@ -313,7 +329,8 @@ struct AreaSelectionTests {
 
         let start = CGPoint(x: rect.minX, y: rect.minY)
         let end = CGPoint(x: rect.maxX, y: rect.maxY)
-        coordinator.onChanged(location: end, startLocation: start, translation: .zero, in: viewportSize)
+        coordinator.onChanged(
+            location: end, startLocation: start, translation: .zero, in: viewportSize)
         #expect(controller.dragPoints == [start, end])
 
         coordinator.onEnded()
@@ -328,7 +345,7 @@ struct AreaSelectionTests {
         // A cylinder tessellated with a moderate deflection has dozens of
         // side-face-adjacent triangles feeding a handful of real faces (3 for
         // an analytic cylinder), but the enumeration cost in `selectRectangle`
-        // scales with candidate SUB-SHAPE count, not triangle count — this
+        // scales with candidate SUB-SHAPE count, not triangle count: this
         // exercises that path against a shape with a non-trivial vertex count
         // per face. Noted tested count: 3 faces / bbox-derived vertex sets.
         let ctx = makeContext()
@@ -346,7 +363,10 @@ struct AreaSelectionTests {
         }
         let elapsed = Date().timeIntervalSince(start)
 
-        #expect(elapsed < 2.0, "50 rectangle selections over a displayed cylinder took \(elapsed)s — expected well under 2s")
+        #expect(
+            elapsed < 2.0,
+            "50 rectangle selections over a displayed cylinder took \(elapsed)s, expected well under 2s"
+        )
         #expect(!ctx.selection.isEmpty)
     }
 }

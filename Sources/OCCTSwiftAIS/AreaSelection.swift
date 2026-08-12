@@ -1,7 +1,7 @@
 import Foundation
-import simd
 import OCCTSwift
 import OCCTSwiftViewport
+import simd
 
 /// How a rectangle/lasso area selection decides whether a candidate sub-shape
 /// counts as "inside" the region.
@@ -14,8 +14,9 @@ public enum AreaSelectionMode: Sendable {
     case intersecting
 }
 
-/// How an area selection combines with the existing `Selection`. Mirrors
-/// OCCT's `AIS_SelectionScheme`.
+/// How an area selection combines with the existing `Selection`.
+///
+/// Mirrors OCCT's `AIS_SelectionScheme`.
 public enum SelectionScheme: Sendable {
     case replace
     case add
@@ -29,11 +30,11 @@ extension InteractiveContext {
     /// installed `filters`, same as a point pick) whose screen-space
     /// projection falls inside the rectangle spanned by `from`/`to`.
     ///
-    /// **Implementation note — a departure from a GPU-pixel-scan approach.**
+    /// **Implementation note: a departure from a GPU-pixel-scan approach.**
     /// OCCTSwiftViewport's GPU pick path only resolves one screen pixel at a
     /// time (`ViewportRenderer.performPick(at:completion:)`); there is no
     /// batch/region readback of the pick texture to build on, and the pick
-    /// texture itself is GPU-private (not CPU-readable) — so a "GPU-based
+    /// texture itself is GPU-private (not CPU-readable), so a "GPU-based
     /// `.intersecting`" implementation isn't available without a new
     /// OCCTSwiftViewport-side API. This projects each candidate's own
     /// vertices into screen space via the existing public
@@ -41,18 +42,18 @@ extension InteractiveContext {
     /// (CPU-side, vertex-based). Two consequences, both worth knowing:
     ///
     /// - **No occlusion handling.** A sub-shape hidden behind another one can
-    ///   still be selected if its projected vertices land in the region — this
+    ///   still be selected if its projected vertices land in the region; this
     ///   is not "what you can see," unlike a GPU-pixel read would be.
     /// - **Vertex-only approximation.** Enclosure/intersection is tested
     ///   against each candidate's *vertices*, not its full rasterized
     ///   silhouette. A large, curved, or planar face whose vertices all sit
-    ///   outside the region — while the region itself sits entirely inside the
-    ///   face's interior — will not be detected as intersecting. Curved edges
+    ///   outside the region, while the region itself sits entirely inside the
+    ///   face's interior, will not be detected as intersecting. Curved edges
     ///   are approximated by their endpoints only.
     ///
     /// - Parameters:
     ///   - from: One screen-space corner of the rectangle (view-local
-    ///     coordinates — top-left origin, same convention `worldToScreen`
+    ///     coordinates: top-left origin, same convention `worldToScreen`
     ///     produces and `DragGesture`'s locations use).
     ///   - to: The opposite corner.
     ///   - mode: `.enclosed` or `.intersecting`.
@@ -75,8 +76,9 @@ extension InteractiveContext {
     }
 
     /// Select every candidate sub-shape whose screen-space projection falls
-    /// inside the freeform polygon through `points` (implicitly closed). See
-    /// `selectRectangle(from:to:mode:scheme:viewportSize:)` for the
+    /// inside the freeform polygon through `points` (implicitly closed).
+    ///
+    /// See `selectRectangle(from:to:mode:scheme:viewportSize:)` for the
     /// implementation notes and limitations shared by both.
     public func selectPolygon(
         _ points: [CGPoint],
@@ -96,7 +98,8 @@ extension InteractiveContext {
         test: ([CGPoint]) -> Bool
     ) {
         let camera = viewport.cameraState
-        let vpMatrix = camera.projectionMatrix(aspectRatio: viewport.lastAspectRatio) * camera.viewMatrix
+        let vpMatrix =
+            camera.projectionMatrix(aspectRatio: viewport.lastAspectRatio) * camera.viewMatrix
 
         var matched: Set<SubShape> = []
         for object in displayedObjects() {
@@ -115,9 +118,11 @@ extension InteractiveContext {
             if selectionMode.contains(.face), let table = faceIdentityTable(for: object) {
                 for ordinal in 0..<table.shapes.count {
                     guard let shape = table.shape(forOrdinal: ordinal) else { continue }
-                    let points = project(shape.vertices(), vpMatrix: vpMatrix, viewportSize: viewportSize)
+                    let points = project(
+                        shape.vertices(), vpMatrix: vpMatrix, viewportSize: viewportSize)
                     let uid = table.uid(forOrdinal: ordinal)
-                    let candidate = SubShape.face(object, ref: SubShapeRef(shape: shape, uid: uid, ordinal: ordinal))
+                    let candidate = SubShape.face(
+                        object, ref: SubShapeRef(shape: shape, uid: uid, ordinal: ordinal))
                     if test(points), passesInstalledFilters(candidate) {
                         matched.insert(candidate)
                     }
@@ -127,9 +132,11 @@ extension InteractiveContext {
             if selectionMode.contains(.edge), let table = edgeIdentityTable(for: object) {
                 for ordinal in 0..<table.shapes.count {
                     guard let shape = table.shape(forOrdinal: ordinal) else { continue }
-                    let points = project(shape.vertices(), vpMatrix: vpMatrix, viewportSize: viewportSize)
+                    let points = project(
+                        shape.vertices(), vpMatrix: vpMatrix, viewportSize: viewportSize)
                     let uid = table.uid(forOrdinal: ordinal)
-                    let candidate = SubShape.edge(object, ref: SubShapeRef(shape: shape, uid: uid, ordinal: ordinal))
+                    let candidate = SubShape.edge(
+                        object, ref: SubShapeRef(shape: shape, uid: uid, ordinal: ordinal))
                     if test(points), passesInstalledFilters(candidate) {
                         matched.insert(candidate)
                     }
@@ -139,9 +146,11 @@ extension InteractiveContext {
             if selectionMode.contains(.vertex), let table = vertexIdentityTable(for: object) {
                 for ordinal in 0..<table.shapes.count {
                     guard let shape = table.shape(forOrdinal: ordinal) else { continue }
-                    let points = project(shape.vertices(), vpMatrix: vpMatrix, viewportSize: viewportSize)
+                    let points = project(
+                        shape.vertices(), vpMatrix: vpMatrix, viewportSize: viewportSize)
                     let uid = table.uid(forOrdinal: ordinal)
-                    let candidate = SubShape.vertex(object, ref: SubShapeRef(shape: shape, uid: uid, ordinal: ordinal))
+                    let candidate = SubShape.vertex(
+                        object, ref: SubShapeRef(shape: shape, uid: uid, ordinal: ordinal))
                     if test(points), passesInstalledFilters(candidate) {
                         matched.insert(candidate)
                     }
@@ -151,13 +160,15 @@ extension InteractiveContext {
 
         switch scheme {
         case .replace: setSelection(Selection(matched))
-        case .add:     setSelection(Selection(selection.subshapes.union(matched)))
-        case .remove:  setSelection(Selection(selection.subshapes.subtracting(matched)))
-        case .xor:     setSelection(Selection(selection.subshapes.symmetricDifference(matched)))
+        case .add: setSelection(Selection(selection.subshapes.union(matched)))
+        case .remove: setSelection(Selection(selection.subshapes.subtracting(matched)))
+        case .xor: setSelection(Selection(selection.subshapes.symmetricDifference(matched)))
         }
     }
 
-    private func project(_ worldPoints: [SIMD3<Double>], vpMatrix: simd_float4x4, viewportSize: CGSize) -> [CGPoint] {
+    private func project(
+        _ worldPoints: [SIMD3<Double>], vpMatrix: simd_float4x4, viewportSize: CGSize
+    ) -> [CGPoint] {
         worldPoints.compactMap {
             ProjectionUtility.worldToScreen(
                 point: SIMD3<Float>(Float($0.x), Float($0.y), Float($0.z)),
@@ -183,7 +194,7 @@ enum AreaSelectionGeometry {
     static func matches(_ points: [CGPoint], rect: CGRect, mode: AreaSelectionMode) -> Bool {
         guard !points.isEmpty else { return false }
         switch mode {
-        case .enclosed:     return points.allSatisfy { rect.contains($0) }
+        case .enclosed: return points.allSatisfy { rect.contains($0) }
         case .intersecting: return points.contains { rect.contains($0) }
         }
     }
@@ -191,7 +202,7 @@ enum AreaSelectionGeometry {
     static func matches(_ points: [CGPoint], polygon: [CGPoint], mode: AreaSelectionMode) -> Bool {
         guard !points.isEmpty else { return false }
         switch mode {
-        case .enclosed:     return points.allSatisfy { pointInPolygon($0, polygon) }
+        case .enclosed: return points.allSatisfy { pointInPolygon($0, polygon) }
         case .intersecting: return points.contains { pointInPolygon($0, polygon) }
         }
     }
@@ -203,9 +214,11 @@ enum AreaSelectionGeometry {
         var inside = false
         var j = polygon.count - 1
         for i in 0..<polygon.count {
-            let pi = polygon[i], pj = polygon[j]
+            let pi = polygon[i]
+            let pj = polygon[j]
             if (pi.y > point.y) != (pj.y > point.y),
-               point.x < (pj.x - pi.x) * (point.y - pi.y) / (pj.y - pi.y) + pi.x {
+                point.x < (pj.x - pi.x) * (point.y - pi.y) / (pj.y - pi.y) + pi.x
+            {
                 inside.toggle()
             }
             j = i

@@ -1,7 +1,8 @@
-import Testing
-import simd
 import OCCTSwift
 import OCCTSwiftViewport
+import Testing
+import simd
+
 @testable import OCCTSwiftAIS
 
 /// Acceptance-criteria coverage for issue #31: `InteractiveContext` retains one
@@ -24,32 +25,37 @@ struct InteractiveContextMutationTests {
         ctx.selectionMode = [.face]
         var obj = ctx.display(base)
 
-        // Select the bottom face (z=0) — neither cut below touches it.
+        // Select the bottom face (z=0): neither cut below touches it.
         let faces = base.faces()
         let centroids = base.measure().faceCentroids
-        let bottomIndex = try #require(centroids.enumerated().min { $0.element.z < $1.element.z }?.offset)
+        let bottomIndex = try #require(
+            centroids.enumerated().min { $0.element.z < $1.element.z }?.offset)
         let identity0 = try #require(ctx.faceIdentityTable(for: obj))
         let bottomShape = try #require(identity0.shape(forOrdinal: bottomIndex))
         let bottomUID = try #require(identity0.uid(forOrdinal: bottomIndex))
-        ctx.select(.face(obj, ref: SubShapeRef(shape: bottomShape, uid: bottomUID, ordinal: bottomIndex)))
+        ctx.select(
+            .face(obj, ref: SubShapeRef(shape: bottomShape, uid: bottomUID, ordinal: bottomIndex)))
         #expect(ctx.selection.count == 1)
         _ = faces
 
         // First mutation: cut a channel across the TOP face.
         let tool1 = try #require(Shape.box(origin: SIMD3(-1, 4, 8), width: 12, height: 2, depth: 4))
         let (result1, history1) = try #require(base.subtractedWithFullHistory(tool1))
-        obj = try #require(ctx.update(obj, to: result1, absorbing: history1, operationName: "cut-top"))
+        obj = try #require(
+            ctx.update(obj, to: result1, absorbing: history1, operationName: "cut-top"))
         #expect(ctx.selection.count == 1, "bottom face untouched by cut-top should survive")
         #expect(ctx.selection.subshapes.allSatisfy { $0.object == obj })
 
         // Second mutation, chained on the FIRST result: cut a channel across a
         // SIDE face (x=0..10, y=0, z=0..10 face), still not the bottom.
-        let tool2 = try #require(Shape.box(origin: SIMD3(3, -1, -1), width: 4, height: 2, depth: 12))
+        let tool2 = try #require(
+            Shape.box(origin: SIMD3(3, -1, -1), width: 4, height: 2, depth: 12))
         let (result2, history2) = try #require(result1.subtractedWithFullHistory(tool2))
-        let updated = try #require(ctx.update(obj, to: result2, absorbing: history2, operationName: "cut-side"))
+        let updated = try #require(
+            ctx.update(obj, to: result2, absorbing: history2, operationName: "cut-side"))
 
         // Surviving across TWO successive absorbs only works if `update` reused
-        // the SAME BRepGraph instance both times — a fresh graph on the
+        // the SAME BRepGraph instance both times: a fresh graph on the
         // second call would reject the first call's uid as foreign (#295) and
         // the selection would silently empty out.
         #expect(ctx.selection.count == 1, "bottom face should survive a second successive mutation")
@@ -60,7 +66,9 @@ struct InteractiveContextMutationTests {
             let face = try #require(resolvedFace)
             // Bottom face normal should still point roughly along -Z.
             let normal = try #require(face.normal)
-            #expect(normal.z < -0.9 || normal.z > 0.9, "expected the axis-aligned bottom face, got normal \(normal)")
+            #expect(
+                normal.z < -0.9 || normal.z > 0.9,
+                "expected the axis-aligned bottom face, got normal \(normal)")
         } else {
             Issue.record("expected a surviving .face sub-shape")
         }
@@ -81,7 +89,7 @@ struct InteractiveContextMutationTests {
     /// Mirrors OCCTSwiftTools' own `t_sharedFaceBetweenShellsResolvesToOneGraphUID`
     /// fixture (two shells built from a box's faces, one face shared between
     /// them) but drives it through `InteractiveContext.display` + real synthesized
-    /// picks rather than calling `FaceIdentityTable` directly — this is the
+    /// picks rather than calling `FaceIdentityTable` directly: this is the
     /// consumer-side regression #31 calls for: every face pick on a multi-shell
     /// solid with a shared face must resolve to the correct sub-shape, not a
     /// neighbour shifted by the shared face's index collapse.
@@ -92,11 +100,12 @@ struct InteractiveContextMutationTests {
         let sharedFace = boxFaces[0]
 
         let shellA = try #require(Shape.shellFromFaces([sharedFace, boxFaces[1], boxFaces[2]]))
-        let shellB = try #require(Shape.shellFromFaces([sharedFace, boxFaces[3], boxFaces[4], boxFaces[5]]))
+        let shellB = try #require(
+            Shape.shellFromFaces([sharedFace, boxFaces[3], boxFaces[4], boxFaces[5]]))
         let compound = try #require(Shape.compound([shellA, shellB]))
 
         // Raw render-path traversal counts the shared face once per shell (7);
-        // `subShapes(ofType:)` collapses it to 6 — the exact divergence #42/#31
+        // `subShapes(ofType:)` collapses it to 6: the exact divergence #42/#31
         // are about. FaceIdentityTable.shapes is built from the former.
         #expect(compound.faces().count == 7)
         #expect(compound.subShapes(ofType: .face).count == 6)
@@ -112,7 +121,7 @@ struct InteractiveContextMutationTests {
         let uid0 = try #require(identity.uid(forOrdinal: 0))
         let uid3 = try #require(identity.uid(forOrdinal: 3))
         #expect(uid0 == uid3)
-        // Sanity: the equality above isn't vacuous — an unshared ordinal differs.
+        // Sanity: the equality above isn't vacuous, an unshared ordinal differs.
         let uid1 = try #require(identity.uid(forOrdinal: 1))
         #expect(uid1 != uid0)
 
@@ -133,7 +142,8 @@ struct InteractiveContextMutationTests {
             ctx.handlePick(pick)
 
             guard case .face(let pickedObj, let ref)? = ctx.selection.subshapes.first else {
-                Issue.record("triangle \(triIdx) (ordinal \(ordinal)) should resolve to a .face sub-shape")
+                Issue.record(
+                    "triangle \(triIdx) (ordinal \(ordinal)) should resolve to a .face sub-shape")
                 continue
             }
             #expect(pickedObj == obj)
@@ -141,8 +151,12 @@ struct InteractiveContextMutationTests {
             #expect(resolvedFace != nil, "ordinal \(ordinal) should resolve to a genuine face")
             uidByOrdinal[ordinal] = ref.uid
         }
-        #expect(seenOrdinals.count == 7, "every one of the 7 render-path ordinals should be reachable by a pick")
-        #expect(uidByOrdinal[0] != nil && uidByOrdinal[0] == uidByOrdinal[3],
-                "picks landing on either shell's copy of the shared face must resolve to the same durable identity")
+        #expect(
+            seenOrdinals.count == 7,
+            "every one of the 7 render-path ordinals should be reachable by a pick")
+        #expect(
+            uidByOrdinal[0] != nil && uidByOrdinal[0] == uidByOrdinal[3],
+            "picks landing on either shell's copy of the shared face must resolve to the same durable identity"
+        )
     }
 }

@@ -1,6 +1,7 @@
-import Testing
 import OCCTSwift
 import OCCTSwiftViewport
+import Testing
+
 @testable import OCCTSwiftAIS
 
 @MainActor

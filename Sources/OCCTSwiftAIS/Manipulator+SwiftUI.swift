@@ -1,6 +1,6 @@
+import OCCTSwiftViewport
 import SwiftUI
 import simd
-import OCCTSwiftViewport
 
 /// SwiftUI integration for `ManipulatorWidget`.
 ///
@@ -10,10 +10,10 @@ import OCCTSwiftViewport
 /// or forwards the gesture to the viewport's camera (`handleOrbit` / `endOrbit`)
 /// when the user dragged outside any handle.
 ///
-/// The widget must already be `install(in:)`-ed in an `InteractiveContext` —
+/// The widget must already be `install(in:)`-ed in an `InteractiveContext`;
 /// the modifier reads `widget.context` to find the viewport.
-public extension View {
-    func attachManipulator(_ widget: ManipulatorWidget) -> some View {
+extension View {
+    public func attachManipulator(_ widget: ManipulatorWidget) -> some View {
         modifier(ManipulatorGestureModifier(widget: widget))
     }
 }
@@ -91,7 +91,9 @@ final class ManipulatorGestureCoordinator {
 }
 
 /// Map a SwiftUI gesture point (origin top-left, Y-down) to NDC ([-1, 1] with
-/// Y-up). Returns `.zero` for a degenerate `viewSize`.
+/// Y-up).
+///
+/// Returns `.zero` for a degenerate `viewSize`.
 func ndcFromPoint(_ p: CGPoint, in viewSize: CGSize) -> SIMD2<Float> {
     guard viewSize.width > 0, viewSize.height > 0 else { return .zero }
     let nx = Float((p.x / viewSize.width) * 2.0 - 1.0)

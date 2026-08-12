@@ -8,13 +8,13 @@ extension InteractiveContext {
     /// shape state into a new `Selection` against `newObject`, using history
     /// absorbed into `graph` via `BRepGraph.add(_:absorbing:inputRoots:operationName:)`.
     ///
-    /// Resolution goes entirely through each sub-shape's durable `GraphUID` —
-    /// never a stored ordinal — so there is no index-correlation guesswork:
+    /// Resolution goes entirely through each sub-shape's durable `GraphUID`,
+    /// never a stored ordinal, so there is no index-correlation guesswork:
     /// `BRepGraph.node(forUID:)` rejects a uid that didn't come from
     /// `graph` itself, so a sub-shape can never resolve to a coincidentally
     /// matching but wrong neighbour the way a raw-index lookup could. A
     /// `.face`/`.edge`/`.vertex` sub-shape with no `uid` at all (no graph was
-    /// in hand at pick time) is dropped — there's nothing durable to resolve
+    /// in hand at pick time) is dropped: there's nothing durable to resolve
     /// it by.
     ///
     /// - **1 → 1** (sub-shape modified in place): the result carries the same
@@ -25,7 +25,7 @@ extension InteractiveContext {
     ///   (same `graph`) to tell a deletion from a sub-shape that was simply
     ///   never selected.
     ///
-    /// `.body(_)` sub-shapes always rebind to `newObject` — the body-level
+    /// `.body(_)` sub-shapes always rebind to `newObject`: the body-level
     /// concept is identity-stable across mutations by construction.
     ///
     /// Every successor gets its render-path `ordinal` from `newObject`'s
@@ -66,23 +66,26 @@ extension InteractiveContext {
         return Selection(result)
     }
 
-    /// Whether `subshape`'s durable node was explicitly consumed by history
-    /// absorbed into `graph` — as opposed to simply never being mentioned by
-    /// any recorded operation. Distinguishes "the operation deleted this" from
-    /// "this wasn't touched" / "this wasn't selected", which `remap`'s silent
-    /// drop can't on its own (see `BRepGraph.historyIsDeleted(_:)`).
+    /// Whether `subshape's` durable node was explicitly consumed by history
+    /// absorbed into `graph`, as opposed to simply never being mentioned by
+    /// any recorded operation.
+    ///
+    /// Distinguishes "the operation deleted this" from "this wasn't touched"
+    /// / "this wasn't selected", which `remap's` silent drop can't on its own
+    /// (see `BRepGraph.historyIsDeleted(_:)`).
     ///
     /// `.body` sub-shapes and sub-shapes with no `uid`, or whose `uid` isn't
-    /// `graph`'s own, always return `false` — there's no node in `graph` to
+    /// `graph's` own, always return `false`: there's no node in `graph` to
     /// ask about.
     public func isDeleted(_ subshape: SubShape, in graph: BRepGraph) -> Bool {
         guard let ref = subshape.ref, let uid = ref.uid,
-              let node = graph.node(forUID: uid) else { return false }
+            let node = graph.node(forUID: uid)
+        else { return false }
         let kind: BRepGraph.NodeKind
         switch subshape {
-        case .body:   return false
-        case .face:   kind = .face
-        case .edge:   kind = .edge
+        case .body: return false
+        case .face: kind = .face
+        case .edge: kind = .edge
         case .vertex: kind = .vertex
         }
         return graph.historyIsDeleted(BRepGraph.NodeRef(kind: kind, index: node.index))
@@ -98,7 +101,8 @@ extension InteractiveContext {
         let original = BRepGraph.NodeRef(kind: kind, index: node.index)
         let successors = graph.findDerivedOrSelf(of: original).filter { $0.kind == kind }
         return successors.compactMap { successor in
-            guard let shape = graph.shape(nodeKind: successor.kind, nodeIndex: successor.index) else {
+            guard let shape = graph.shape(nodeKind: successor.kind, nodeIndex: successor.index)
+            else {
                 return nil
             }
             let newUID = graph.uid(ofNodeKind: Int(successor.kind.rawValue), index: successor.index)

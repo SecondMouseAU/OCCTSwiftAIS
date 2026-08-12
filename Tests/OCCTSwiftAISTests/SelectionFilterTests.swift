@@ -1,7 +1,8 @@
-import Testing
-import simd
 import OCCTSwift
 import OCCTSwiftViewport
+import Testing
+import simd
+
 @testable import OCCTSwiftAIS
 
 @MainActor
@@ -80,7 +81,8 @@ struct SelectionFilterTests {
             }
         }
         #expect(sawCircle, "cylinder fixture should have circular rim edges")
-        _ = sawLine  // a seam line may or may not be present depending on OCCT's cylinder construction
+        // A seam line may or may not be present depending on OCCT's cylinder construction.
+        _ = sawLine
     }
 
     // MARK: - ShapeTypeFilter
@@ -103,28 +105,35 @@ struct SelectionFilterTests {
         let faces = obj.shape.faces()
         let cylindricalIdx = try #require(faces.firstIndex { $0.surfaceType == .cylinder })
         let cylindricalShape = try #require(Shape.fromFace(faces[cylindricalIdx]))
-        let candidate = SubShape.face(obj, ref: SubShapeRef(shape: cylindricalShape, ordinal: cylindricalIdx))
+        let candidate = SubShape.face(
+            obj, ref: SubShapeRef(shape: cylindricalShape, ordinal: cylindricalIdx))
 
         // AllOf(cylindrical-surface, radius < 10) accepts a radius-4 cylinder face.
         let smallRadius = AllOfFilter([
             SurfaceTypeFilter([.cylinder]),
             PredicateFilter { sub in
                 guard case .face(_, let ref) = sub, let face = Face(ref.shape) else { return false }
-                return face.bounds.max.x - face.bounds.min.x < 20  // loose bbox-based proxy for radius
+                // Loose bbox-based proxy for radius.
+                return face.bounds.max.x - face.bounds.min.x < 20
             },
         ])
         #expect(smallRadius.accepts(candidate))
 
         // AllOf(cylindrical-surface, always-false) rejects everything.
-        let neverAccepts = AllOfFilter([SurfaceTypeFilter([.cylinder]), PredicateFilter { _ in false }])
+        let neverAccepts = AllOfFilter([
+            SurfaceTypeFilter([.cylinder]), PredicateFilter { _ in false },
+        ])
         #expect(!neverAccepts.accepts(candidate))
     }
 
     @Test func t_anyOfFilter_acceptsIfAnyFilterAccepts() throws {
         let ctx = makeContext()
         let obj = ctx.display(try makeBox())
-        #expect(AnyOfFilter([ShapeTypeFilter([.edge]), ShapeTypeFilter([.body])]).accepts(.body(obj)))
-        #expect(!AnyOfFilter([ShapeTypeFilter([.edge]), ShapeTypeFilter([.vertex])]).accepts(.body(obj)))
+        #expect(
+            AnyOfFilter([ShapeTypeFilter([.edge]), ShapeTypeFilter([.body])]).accepts(.body(obj)))
+        #expect(
+            !AnyOfFilter([ShapeTypeFilter([.edge]), ShapeTypeFilter([.vertex])]).accepts(.body(obj))
+        )
     }
 
     @Test func t_notFilter_invertsAnotherFilter() throws {
@@ -155,10 +164,14 @@ struct SelectionFilterTests {
         let body = try #require(ctx.sourceBody(for: obj))
         // Find a triangle whose face ordinal is a planar cap.
         let identity = try #require(ctx.faceIdentityTable(for: obj))
-        guard let planarOrdinal = (0..<identity.shapes.count).first(where: { ord in
-            guard let shape = identity.shape(forOrdinal: ord), let face = Face(shape) else { return false }
-            return face.surfaceType == .plane
-        }), let triIdx = body.faceIndices.firstIndex(where: { Int($0) == planarOrdinal }) else {
+        guard
+            let planarOrdinal = (0..<identity.shapes.count).first(where: { ord in
+                guard let shape = identity.shape(forOrdinal: ord), let face = Face(shape) else {
+                    return false
+                }
+                return face.surfaceType == .plane
+            }), let triIdx = body.faceIndices.firstIndex(where: { Int($0) == planarOrdinal })
+        else {
             Issue.record("expected a planar face ordinal reachable by a triangle")
             return
         }
@@ -167,7 +180,9 @@ struct SelectionFilterTests {
         let pick = try #require(PickResult(rawValue: raw, indexMap: [0: body.id]))
         ctx.handlePick(pick)
 
-        #expect(ctx.selection.isEmpty, "a filtered-out pick should leave the selection unchanged (still empty)")
+        #expect(
+            ctx.selection.isEmpty,
+            "a filtered-out pick should leave the selection unchanged (still empty)")
     }
 
     @Test func t_handlePick_filterAcceptsCylindricalFace_selects() throws {
@@ -178,10 +193,14 @@ struct SelectionFilterTests {
 
         let body = try #require(ctx.sourceBody(for: obj))
         let identity = try #require(ctx.faceIdentityTable(for: obj))
-        guard let cylOrdinal = (0..<identity.shapes.count).first(where: { ord in
-            guard let shape = identity.shape(forOrdinal: ord), let face = Face(shape) else { return false }
-            return face.surfaceType == .cylinder
-        }), let triIdx = body.faceIndices.firstIndex(where: { Int($0) == cylOrdinal }) else {
+        guard
+            let cylOrdinal = (0..<identity.shapes.count).first(where: { ord in
+                guard let shape = identity.shape(forOrdinal: ord), let face = Face(shape) else {
+                    return false
+                }
+                return face.surfaceType == .cylinder
+            }), let triIdx = body.faceIndices.firstIndex(where: { Int($0) == cylOrdinal })
+        else {
             Issue.record("expected a cylindrical face ordinal reachable by a triangle")
             return
         }
@@ -205,7 +224,9 @@ struct SelectionFilterTests {
         let pick = try #require(PickResult(rawValue: 0, indexMap: [0: bodyB.id]))
         ctx.handlePick(pick)
 
-        #expect(ctx.selection.subshapes == [.body(a)], "a rejected pick behaves like an empty-space pick")
+        #expect(
+            ctx.selection.subshapes == [.body(a)],
+            "a rejected pick behaves like an empty-space pick")
     }
 
     @Test func t_handleHover_filterGatesHoverSameAsSelection() throws {
@@ -251,14 +272,14 @@ struct SelectionFilterTests {
     }
 
     @Test func t_multipleInstalledFilters_combineWithAND_notOR() throws {
-        // A deliberate departure from OCCT's OR semantics — see
+        // A deliberate departure from OCCT's OR semantics: see
         // InteractiveContext.passesInstalledFilters. Installing an
         // accept-everything filter alongside a reject-everything filter must
         // still reject, since AND requires ALL filters to accept.
         let ctx = makeContext()
         let obj = ctx.display(try makeBox())
         ctx.addFilter(ShapeTypeFilter([.body, .face, .edge, .vertex]))  // accepts everything
-        ctx.addFilter(ShapeTypeFilter([]))                              // accepts nothing
+        ctx.addFilter(ShapeTypeFilter([]))  // accepts nothing
         #expect(ctx.passesInstalledFilters(.body(obj)) == false)
     }
 
@@ -278,12 +299,13 @@ struct SelectionFilterTests {
         widget.install(in: ctx)
 
         // Widget picks route through viewport.widgetPickResult, never through
-        // InteractiveContext.handlePick / passesInstalledFilters — a restrictive
+        // InteractiveContext.handlePick / passesInstalledFilters: a restrictive
         // context-level filter must not affect the widget at all.
         let midpoint = ManipulatorWidget.Axis.x.direction * widget.size * 0.5
         let ndc3 = try #require(ProjectionUtility.worldToNDC(point: midpoint, vpMatrix: vpMatrix))
         let hit = widget.hitTest(ndc: SIMD2<Float>(ndc3.x, ndc3.y), camera: camera, aspect: aspect)
-        #expect(hit == .x, "widget hit-testing should be unaffected by context-level selection filters")
+        #expect(
+            hit == .x, "widget hit-testing should be unaffected by context-level selection filters")
 
         // And a pick landing on a widget body still produces no user selection,
         // exactly as without any filters installed.

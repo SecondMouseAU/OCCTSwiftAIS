@@ -1,16 +1,16 @@
 import Foundation
-import simd
 import OCCTSwiftViewport
+import simd
 
-/// Visual aids per SPEC.md §"Standard objects". Each constructs `ViewportBody`
-/// instances via `makeBodies()`; the caller appends them to their
-/// `InteractiveContext.bodies`. They aren't selectable — they ride on the
-/// `.userGeometry` pick layer but no `display(_:)` registration is implied,
-/// so picks on them produce no `Selection` updates.
+// Visual aids per SPEC.md §"Standard objects". Each constructs `ViewportBody`
+// instances via `makeBodies()`; the caller appends them to their
+// `InteractiveContext.bodies`. They aren't selectable: they ride on the
+// `.userGeometry` pick layer but no `display(_:)` registration is implied,
+// so picks on them produce no `Selection` updates.
 
 // MARK: - Trihedron
 
-/// Three colored axis arrows plus a small center sphere — the canonical
+/// Three colored axis arrows plus a small center sphere: the canonical
 /// "world axes" affordance.
 public final class Trihedron: @unchecked Sendable {
     public let id: String
@@ -44,17 +44,20 @@ public final class Trihedron: @unchecked Sendable {
             )
             bodies.append(body)
         }
-        bodies.append(StandardObjectGeometry.makeSphere(
-            id: "\(id).origin",
-            center: origin,
-            radius: sphereRadius,
-            color: SIMD4<Float>(0.85, 0.85, 0.85, 1)
-        ))
+        bodies.append(
+            StandardObjectGeometry.makeSphere(
+                id: "\(id).origin",
+                center: origin,
+                radius: sphereRadius,
+                color: SIMD4<Float>(0.85, 0.85, 0.85, 1)
+            ))
         return bodies
     }
 
     /// Predicate matching every body this object would emit (`id` plus dotted
-    /// suffix). Use to remove the object from a `bodies` array later.
+    /// suffix).
+    ///
+    /// Use to remove the object from a `bodies` array later.
     public func ownsBody(id bodyID: String) -> Bool {
         bodyID == id || bodyID.hasPrefix("\(id).")
     }
@@ -85,13 +88,15 @@ public final class WorkPlane: @unchecked Sendable {
     }
 
     public func makeBodies() -> [ViewportBody] {
-        [StandardObjectGeometry.makeQuad(
-            id: id,
-            origin: origin,
-            normal: normal,
-            size: size,
-            color: color
-        )]
+        [
+            StandardObjectGeometry.makeQuad(
+                id: id,
+                origin: origin,
+                normal: normal,
+                size: size,
+                color: color
+            )
+        ]
     }
 
     public func ownsBody(id bodyID: String) -> Bool { bodyID == id }
@@ -99,8 +104,9 @@ public final class WorkPlane: @unchecked Sendable {
 
 // MARK: - Axis
 
-/// A thin cylinder between `from` and `to`. Useful for marking reference lines
-/// (rotation axes, datum lines, etc.).
+/// A thin cylinder between `from` and `to`.
+///
+/// Useful for marking reference lines (rotation axes, datum lines, etc.).
 public final class Axis: @unchecked Sendable {
     public let id: String
     public let from: SIMD3<Float>
@@ -123,13 +129,15 @@ public final class Axis: @unchecked Sendable {
     }
 
     public func makeBodies() -> [ViewportBody] {
-        [StandardObjectGeometry.makeCylinder(
-            id: id,
-            from: from,
-            to: to,
-            radius: radius,
-            color: color
-        )]
+        [
+            StandardObjectGeometry.makeCylinder(
+                id: id,
+                from: from,
+                to: to,
+                radius: radius,
+                color: color
+            )
+        ]
     }
 
     public func ownsBody(id bodyID: String) -> Bool { bodyID == id }
@@ -137,10 +145,11 @@ public final class Axis: @unchecked Sendable {
 
 // MARK: - PointCloud
 
-/// A cloud of points rendered as small spheres. For v0.2.4, all points share
-/// one color (taken from the first entry of `colors` if provided, else
-/// `defaultColor`). Per-point colors are deferred until the renderer exposes
-/// per-vertex attributes.
+/// A cloud of points rendered as small spheres.
+///
+/// For v0.2.4, all points share one color (taken from the first entry of
+/// `colors` if provided, else `defaultColor`). Per-point colors are deferred
+/// until the renderer exposes per-vertex attributes.
 public final class PointCloudPresentation: @unchecked Sendable {
     public let id: String
     public let points: [SIMD3<Float>]
@@ -170,12 +179,14 @@ public final class PointCloudPresentation: @unchecked Sendable {
         } else {
             color = defaultColor
         }
-        return [StandardObjectGeometry.makeSpheresInOneBody(
-            id: id,
-            centers: points,
-            radius: pointRadius,
-            color: color
-        )]
+        return [
+            StandardObjectGeometry.makeSpheresInOneBody(
+                id: id,
+                centers: points,
+                radius: pointRadius,
+                color: color
+            )
+        ]
     }
 
     public func ownsBody(id bodyID: String) -> Bool { bodyID == id }
@@ -198,8 +209,8 @@ enum StandardObjectGeometry {
         let (u, v) = orthonormalBasis(forNormal: n)
         let half = size * 0.5
         let p0 = origin + (-u - v) * half
-        let p1 = origin + ( u - v) * half
-        let p2 = origin + ( u + v) * half
+        let p1 = origin + (u - v) * half
+        let p2 = origin + (u + v) * half
         let p3 = origin + (-u + v) * half
 
         let verts: [Float] = [
@@ -241,8 +252,10 @@ enum StandardObjectGeometry {
         let (u, v) = orthonormalBasis(forNormal: dir)
         var verts: [Float] = []
         var indices: [UInt32] = []
-        appendCylinderRing(into: &verts, origin: a, axis: dir, u: u, v: v, radius: radius, sides: sides)
-        appendCylinderRing(into: &verts, origin: b, axis: dir, u: u, v: v, radius: radius, sides: sides)
+        appendCylinderRing(
+            into: &verts, origin: a, axis: dir, u: u, v: v, radius: radius, sides: sides)
+        appendCylinderRing(
+            into: &verts, origin: b, axis: dir, u: u, v: v, radius: radius, sides: sides)
         for i in 0..<sides {
             let i1 = (i + 1) % sides
             let i0 = UInt32(i)
@@ -274,8 +287,9 @@ enum StandardObjectGeometry {
     ) -> ViewportBody {
         var verts: [Float] = []
         var indices: [UInt32] = []
-        appendSphere(into: &verts, indices: &indices, vertexOffset: 0,
-                     center: center, radius: radius, sides: sides, rings: rings)
+        appendSphere(
+            into: &verts, indices: &indices, vertexOffset: 0,
+            center: center, radius: radius, sides: sides, rings: rings)
         return ViewportBody(
             id: id,
             vertexData: verts,
@@ -302,8 +316,9 @@ enum StandardObjectGeometry {
         let stride = 6
         for c in centers {
             let offset = UInt32(verts.count / stride)
-            appendSphere(into: &verts, indices: &indices, vertexOffset: offset,
-                         center: c, radius: radius, sides: sides, rings: rings)
+            appendSphere(
+                into: &verts, indices: &indices, vertexOffset: offset,
+                center: c, radius: radius, sides: sides, rings: rings)
         }
         return ViewportBody(
             id: id,
