@@ -1,18 +1,20 @@
-import Foundation
 import Combine
-import simd
+import Foundation
 import OCCTSwift
-import OCCTSwiftViewport
 import OCCTSwiftTools
+import OCCTSwiftViewport
+import simd
 
-/// Per-scene interactive state. One `InteractiveContext` ↔ one `ViewportController`.
+/// Per-scene interactive state.
+///
+/// One `InteractiveContext` ↔ one `ViewportController`.
 ///
 /// The context owns the array of `ViewportBody`s rendered by `MetalViewportView`.
 /// Bind it via `MetalViewportView(controller: ctx.viewport, bodies: $ctx.bodies)`
 /// when `ctx` is a `@StateObject`.
 ///
 /// ## Selection semantics
-/// - `select(_:)` / `deselect(_:)` mutate the selection as a `Set` — adding the
+/// - `select(_:)` / `deselect(_:)` mutate the selection as a `Set`: adding the
 ///   same sub-shape twice is idempotent.
 /// - A pick event from the viewport **replaces** the selection with the picked
 ///   sub-shape. Empty-space picks (`pickResult == nil`) leave the selection alone.
@@ -26,7 +28,9 @@ public final class InteractiveContext: ObservableObject {
 
     // MARK: - Scene
 
-    /// Bodies fed to `MetalViewportView`. Bind via `$bodies`.
+    /// Bodies fed to `MetalViewportView`.
+    ///
+    /// Bind via `$bodies`.
     @Published public var bodies: [ViewportBody] = []
 
     // MARK: - Selection
@@ -44,18 +48,21 @@ public final class InteractiveContext: ObservableObject {
     }
     @Published public private(set) var hover: SubShape? = nil
 
-    /// Filters gating `handlePick` / `handleHover` — never programmatic
-    /// `select(_:)`. See `SelectionFilter.swift` for the combination semantics
-    /// (AND across installed filters, a deliberate departure from OCCT's OR).
+    /// Filters gating `handlePick` / `handleHover`, never programmatic
+    /// `select(_:)`.
+    ///
+    /// See `SelectionFilter.swift` for the combination semantics (AND across
+    /// installed filters, a deliberate departure from OCCT's OR).
     @Published public private(set) var filters: [any SelectionFilter] = []
 
     // MARK: - Style
 
     public var highlightStyle: HighlightStyle = .default
 
-    /// Dimensions added via `add(_:)`. Strongly held so the dimension lives
-    /// as long as it's displayed; weak refs would let user-discarded
-    /// dimensions vanish from the scene.
+    /// Dimensions added via `add(_:)`.
+    ///
+    /// Strongly held so the dimension lives as long as it's displayed; weak
+    /// refs would let user-discarded dimensions vanish from the scene.
     var dimensionRegistry: [ObjectIdentifier: any Dimension] = [:]
 
     // MARK: - Registry
@@ -71,7 +78,7 @@ public final class InteractiveContext: ObservableObject {
         let vertexIdentity: VertexIdentityTable?
         /// Living per-object graph, built once at `display(_:style:)` and
         /// retained across `update(_:to:absorbing:operationName:)` calls so
-        /// `GraphUID`s minted at pick time keep resolving — see Remap.swift.
+        /// `GraphUID`s minted at pick time keep resolving; see Remap.swift.
         let graph: BRepGraph?
         var style: PresentationStyle
     }
@@ -109,10 +116,10 @@ public final class InteractiveContext: ObservableObject {
     /// Display a shape with topology-aware selection enabled.
     ///
     /// Builds a `BRepGraph` from `shape` and retains it for the object's
-    /// lifetime — see `update(_:to:absorbing:operationName:)` for how it's used
+    /// lifetime; see `update(_:to:absorbing:operationName:)` for how it's used
     /// to carry a selection across a later mutation. Graph construction can
     /// fail on pathological shapes; when it does, the object still displays but
-    /// picks against it mint `SubShapeRef`s with `uid == nil` (ordinal-only —
+    /// picks against it mint `SubShapeRef`s with `uid == nil` (ordinal-only:
     /// `remap` then has nothing durable to resolve them by).
     @discardableResult
     public func display(_ shape: Shape, style: PresentationStyle = .default) -> InteractiveObject {
@@ -123,9 +130,10 @@ public final class InteractiveContext: ObservableObject {
         let graph = BRepGraph(shape: shape)
         graph?.isHistoryEnabled = true
 
-        let (body, metadata, faceIdentity, edgeIdentity, vertexIdentity) = CADFileLoader.shapeToBodyMetadataAndIdentities(
-            shape, id: bodyID, color: rgba, graph: graph
-        )
+        let (body, metadata, faceIdentity, edgeIdentity, vertexIdentity) =
+            CADFileLoader.shapeToBodyMetadataAndIdentities(
+                shape, id: bodyID, color: rgba, graph: graph
+            )
 
         if var body {
             body.isVisible = style.visible
@@ -142,11 +150,11 @@ public final class InteractiveContext: ObservableObject {
     }
 
     /// Update a displayed object after a modelling operation that rebuilds its
-    /// shape — a boolean, a fillet, a chamfer, anything produced via one of
+    /// shape: a boolean, a fillet, a chamfer, anything produced via one of
     /// OCCTSwift's `*WithFullHistory` methods run against `object.shape`.
     ///
     /// Absorbs the operation's history into the object's living `BRepGraph`
-    /// (built once in `display(_:style:)`, retained here across calls — the
+    /// (built once in `display(_:style:)`, retained here across calls: the
     /// input and result share one graph instance, so every `GraphUID` already
     /// held stays resolvable; see `BRepGraph.add(_:absorbing:inputRoots:operationName:)`),
     /// rebuilds the displayed mesh for `newShape`, and remaps any current
@@ -155,7 +163,7 @@ public final class InteractiveContext: ObservableObject {
     ///
     /// `object.id` is unchanged; the returned `InteractiveObject` carries
     /// `newShape`. Returns `nil` if `object` isn't displayed, has no living
-    /// graph (construction failed at `display` time), or the absorb fails —
+    /// graph (construction failed at `display` time), or the absorb fails;
     /// in any of those cases the caller should `remove` and `display` fresh,
     /// accepting that the selection doesn't survive.
     ///
@@ -173,15 +181,20 @@ public final class InteractiveContext: ObservableObject {
         guard let entry = entriesByID[object.id], let graph = entry.graph else { return nil }
         guard let inputRoot = graph.findNode(for: entry.object.shape) else { return nil }
         let rootRef = BRepGraph.NodeRef(kind: inputRoot.kind, index: inputRoot.index)
-        guard graph.add(newShape, absorbing: history, inputRoots: [rootRef], operationName: operationName) != nil else {
+        guard
+            graph.add(
+                newShape, absorbing: history, inputRoots: [rootRef], operationName: operationName)
+                != nil
+        else {
             return nil
         }
 
         let updated = InteractiveObject(id: object.id, shape: newShape)
         let rgba = SIMD4<Float>(entry.style.color, 1.0 - entry.style.transparency)
-        let (body, metadata, faceIdentity, edgeIdentity, vertexIdentity) = CADFileLoader.shapeToBodyMetadataAndIdentities(
-            newShape, id: entry.bodyID, color: rgba, graph: graph
-        )
+        let (body, metadata, faceIdentity, edgeIdentity, vertexIdentity) =
+            CADFileLoader.shapeToBodyMetadataAndIdentities(
+                newShape, id: entry.bodyID, color: rgba, graph: graph
+            )
 
         if let i = bodies.firstIndex(where: { $0.id == entry.bodyID }) {
             if var body {
@@ -237,7 +250,9 @@ public final class InteractiveContext: ObservableObject {
 
     // MARK: - Selection mutation
 
-    /// Add a sub-shape to the current selection. Idempotent.
+    /// Add a sub-shape to the current selection.
+    ///
+    /// Idempotent.
     public func select(_ subshape: SubShape) {
         var s = selection.subshapes
         s.insert(subshape)
@@ -254,20 +269,24 @@ public final class InteractiveContext: ObservableObject {
         selection = Selection()
     }
 
-    /// Replace `selection` wholesale. Used by `AreaSelection.swift` after
-    /// combining a rectangle/lasso match set with the existing selection per
-    /// `SelectionScheme` — kept internal since `select`/`deselect`/
-    /// `clearSelection` are the intended public mutation surface.
+    /// Replace `selection` wholesale.
+    ///
+    /// Used by `AreaSelection.swift` after combining a rectangle/lasso match
+    /// set with the existing selection per `SelectionScheme`; kept internal
+    /// since `select`/`deselect`/`clearSelection` are the intended public
+    /// mutation surface.
     func setSelection(_ newSelection: Selection) {
         selection = newSelection
     }
 
     // MARK: - Selection filters
 
-    /// Add a selection filter. Installed filters gate `handlePick` and
-    /// `handleHover` — never programmatic `select(_:)`. A candidate a filter
-    /// rejects is treated exactly like an empty-space pick: the current
-    /// selection is left unchanged, not cleared.
+    /// Add a selection filter.
+    ///
+    /// Installed filters gate `handlePick` and `handleHover`, never
+    /// programmatic `select(_:)`. A candidate a filter rejects is treated
+    /// exactly like an empty-space pick: the current selection is left
+    /// unchanged, not cleared.
     public func addFilter(_ filter: any SelectionFilter) {
         filters.append(filter)
     }
@@ -284,10 +303,10 @@ public final class InteractiveContext: ObservableObject {
 
     /// Whether `candidate` passes every currently-installed filter.
     ///
-    /// **Combination semantics — a deliberate departure from OCCT.** OCCT's
+    /// **Combination semantics: a deliberate departure from OCCT.** OCCT's
     /// `AIS_InteractiveContext::AddFilter` combines multiple installed filters
     /// with OR (a candidate is kept if *any* installed filter accepts it), which
-    /// reads as a surprising default for narrowing what's selectable — the
+    /// reads as a surprising default for narrowing what's selectable: the
     /// second filter you add can only ever *widen* what's pickable, never narrow
     /// it further. Here, installed filters combine with **AND**: a candidate
     /// must pass *every* installed filter. Express OR explicitly with
@@ -322,8 +341,10 @@ public final class InteractiveContext: ObservableObject {
     }
 
     /// Whether `object` is displayed and its `PresentationStyle.visible` flag
-    /// is set. Area selection skips hidden objects — it shouldn't select what
-    /// isn't visible on screen.
+    /// is set.
+    ///
+    /// Area selection skips hidden objects: it shouldn't select what isn't
+    /// visible on screen.
     func isVisible(_ object: InteractiveObject) -> Bool {
         entriesByID[object.id]?.style.visible ?? false
     }
@@ -340,12 +361,14 @@ public final class InteractiveContext: ObservableObject {
         return bodies.first { $0.id == id }
     }
 
-    /// The identity tables captured for `object` at display/update time, or nil
-    /// if not displayed or no graph was available to mint uids. Used by
-    /// `remap(_:using:rebindingTo:)` in Remap.swift to assign a correct
-    /// render-path ordinal to a remapped sub-shape (rather than falling back to
-    /// the graph's raw node index, which isn't a tessellation ordinal), and by
-    /// area selection to enumerate every candidate sub-shape's `Shape`.
+    /// The identity tables captured for `object` at display/update time, or
+    /// nil if not displayed or no graph was available to mint uids.
+    ///
+    /// Used by `remap(_:using:rebindingTo:)` in Remap.swift to assign a
+    /// correct render-path ordinal to a remapped sub-shape (rather than
+    /// falling back to the graph's raw node index, which isn't a
+    /// tessellation ordinal), and by area selection to enumerate every
+    /// candidate sub-shape's `Shape`.
     func faceIdentityTable(for object: InteractiveObject) -> FaceIdentityTable? {
         entriesByID[object.id]?.faceIdentity
     }
@@ -359,8 +382,9 @@ public final class InteractiveContext: ObservableObject {
     }
 
     /// Append a body created by an internal subsystem (manipulator, dimension, …).
-    /// The body is **not** registered as a selectable `InteractiveObject` and is
-    /// invisible to selection / hover wiring.
+    ///
+    /// The body is **not** registered as a selectable `InteractiveObject` and
+    /// is invisible to selection / hover wiring.
     func appendInternalBody(_ body: ViewportBody) {
         bodies.append(body)
     }
@@ -372,9 +396,10 @@ public final class InteractiveContext: ObservableObject {
 
     // MARK: - Highlight overlay (renderer-backed, OCCTSwiftViewport ≥ 0.55.1)
 
-    /// Body-level selection → `viewport.selectedBodyIDs`. Face-level selection
-    /// → per-triangle styles on the source body's `triangleStyles`. No overlay
-    /// bodies, no normal-offset push.
+    /// Body-level selection → `viewport.selectedBodyIDs`.
+    ///
+    /// Face-level selection → per-triangle styles on the source body's
+    /// `triangleStyles`. No overlay bodies, no normal-offset push.
     private func updateSelectionVisuals() {
         let selectedBodyIDs: Set<String> = Set(
             selection.subshapes.compactMap { sub -> String? in
@@ -384,7 +409,7 @@ public final class InteractiveContext: ObservableObject {
         )
         viewport.selectedBodyIDs = selectedBodyIDs
 
-        // Per-triangle highlight indexes by the render-path ordinal — that's
+        // Per-triangle highlight indexes by the render-path ordinal: that's
         // the only part of SubShapeRef the mesh knows about.
         var facesByObjectID: [UUID: Set<Int>] = [:]
         for sub in selection.subshapes {
@@ -400,7 +425,8 @@ public final class InteractiveContext: ObservableObject {
             }
             let triangleCount = bodies[bodyIdx].indices.count / 3
             guard triangleCount > 0, let metadata = entry.metadata,
-                  metadata.faceIndices.count == triangleCount else {
+                metadata.faceIndices.count == triangleCount
+            else {
                 if !bodies[bodyIdx].triangleStyles.isEmpty {
                     bodies[bodyIdx].triangleStyles = []
                 }
@@ -427,11 +453,12 @@ public final class InteractiveContext: ObservableObject {
 
     // MARK: - Pick / hover wiring
 
-    /// Internal entry point — also called from tests with a synthesised `PickResult`.
+    /// Internal entry point, also called from tests with a synthesised `PickResult`.
     func handlePick(_ result: PickResult?) {
         guard let result,
-              let id = entriesByBodyID[result.bodyID],
-              let entry = entriesByID[id] else { return }
+            let id = entriesByBodyID[result.bodyID],
+            let entry = entriesByID[id]
+        else { return }
 
         if let sub = resolveSubShape(from: result, entry: entry), passesInstalledFilters(sub) {
             selection = Selection([sub])
@@ -440,8 +467,9 @@ public final class InteractiveContext: ObservableObject {
 
     func handleHover(bodyID: String?) {
         guard let bodyID,
-              let id = entriesByBodyID[bodyID],
-              let entry = entriesByID[id] else {
+            let id = entriesByBodyID[bodyID],
+            let entry = entriesByID[id]
+        else {
             hover = nil
             return
         }
@@ -464,19 +492,22 @@ public final class InteractiveContext: ObservableObject {
 
     private func resolveFaceSubShape(from result: PickResult, entry: Entry) -> SubShape? {
         if selectionMode.contains(.face),
-           let metadata = entry.metadata,
-           result.triangleIndex >= 0,
-           result.triangleIndex < metadata.faceIndices.count {
+            let metadata = entry.metadata,
+            result.triangleIndex >= 0,
+            result.triangleIndex < metadata.faceIndices.count
+        {
             let faceIdx = Int(metadata.faceIndices[result.triangleIndex])
             // Prefer the FaceIdentityTable's Shape (captured at tessellation
-            // time — always the exact face that ordinal came from) over
+            // time, always the exact face that ordinal came from) over
             // re-deriving it from the object's own sub-shape enumeration,
             // which need not agree once a face is shared between shells.
             if faceIdx >= 0,
-               let faceShape = entry.faceIdentity?.shape(forOrdinal: faceIdx)
-                    ?? entry.object.shape.subShape(type: .face, index: faceIdx) {
+                let faceShape = entry.faceIdentity?.shape(forOrdinal: faceIdx)
+                    ?? entry.object.shape.subShape(type: .face, index: faceIdx)
+            {
                 let uid = entry.faceIdentity?.uid(forOrdinal: faceIdx)
-                return .face(entry.object, ref: SubShapeRef(shape: faceShape, uid: uid, ordinal: faceIdx))
+                return .face(
+                    entry.object, ref: SubShapeRef(shape: faceShape, uid: uid, ordinal: faceIdx))
             }
         }
         if selectionMode.contains(.body) {
@@ -489,11 +520,13 @@ public final class InteractiveContext: ObservableObject {
         guard selectionMode.contains(.edge) else { return nil }
         guard let body = bodies.first(where: { $0.id == entry.bodyID }) else { return nil }
         guard result.triangleIndex >= 0,
-              result.triangleIndex < body.edgeIndices.count else { return nil }
+            result.triangleIndex < body.edgeIndices.count
+        else { return nil }
         let edgeIdx = Int(body.edgeIndices[result.triangleIndex])
         guard edgeIdx >= 0,
-              let edgeShape = entry.edgeIdentity?.shape(forOrdinal: edgeIdx)
-                ?? entry.object.shape.subShape(type: .edge, index: edgeIdx) else { return nil }
+            let edgeShape = entry.edgeIdentity?.shape(forOrdinal: edgeIdx)
+                ?? entry.object.shape.subShape(type: .edge, index: edgeIdx)
+        else { return nil }
         let uid = entry.edgeIdentity?.uid(forOrdinal: edgeIdx)
         return .edge(entry.object, ref: SubShapeRef(shape: edgeShape, uid: uid, ordinal: edgeIdx))
     }
@@ -502,11 +535,13 @@ public final class InteractiveContext: ObservableObject {
         guard selectionMode.contains(.vertex) else { return nil }
         guard let body = bodies.first(where: { $0.id == entry.bodyID }) else { return nil }
         guard result.triangleIndex >= 0,
-              result.triangleIndex < body.vertexIndices.count else { return nil }
+            result.triangleIndex < body.vertexIndices.count
+        else { return nil }
         let vIdx = Int(body.vertexIndices[result.triangleIndex])
         guard vIdx >= 0,
-              let vertexShape = entry.vertexIdentity?.shape(forOrdinal: vIdx)
-                ?? entry.object.shape.subShape(type: .vertex, index: vIdx) else { return nil }
+            let vertexShape = entry.vertexIdentity?.shape(forOrdinal: vIdx)
+                ?? entry.object.shape.subShape(type: .vertex, index: vIdx)
+        else { return nil }
         let uid = entry.vertexIdentity?.uid(forOrdinal: vIdx)
         return .vertex(entry.object, ref: SubShapeRef(shape: vertexShape, uid: uid, ordinal: vIdx))
     }

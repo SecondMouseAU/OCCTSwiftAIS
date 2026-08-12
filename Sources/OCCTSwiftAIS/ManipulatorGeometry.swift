@@ -1,8 +1,9 @@
-import simd
 import OCCTSwiftViewport
+import simd
 
-/// Builds axis-arrow meshes for the translate manipulator. Pure-Swift tessellation
-/// (cylinder shaft + cone head); no OCCT involvement.
+/// Builds axis-arrow meshes for the translate manipulator.
+///
+/// Pure-Swift tessellation (cylinder shaft + cone head); no OCCT involvement.
 enum ManipulatorGeometry {
 
     /// Build a single axis arrow as a `ViewportBody`.
@@ -29,13 +30,19 @@ enum ManipulatorGeometry {
         var indices: [UInt32] = []
 
         // Shaft cylinder
-        appendCylinderRing(into: &verts, origin: origin,                 axis: dir, u: u, v: v, radius: radius, sides: sides)
-        appendCylinderRing(into: &verts, origin: origin + dir * shaftEnd, axis: dir, u: u, v: v, radius: radius, sides: sides)
-        appendCylinderSideIndices(into: &indices, ringSize: sides, ringStart0: 0, ringStart1: UInt32(sides))
+        appendCylinderRing(
+            into: &verts, origin: origin, axis: dir, u: u, v: v, radius: radius, sides: sides)
+        appendCylinderRing(
+            into: &verts, origin: origin + dir * shaftEnd, axis: dir, u: u, v: v, radius: radius,
+            sides: sides)
+        appendCylinderSideIndices(
+            into: &indices, ringSize: sides, ringStart0: 0, ringStart1: UInt32(sides))
 
-        // Cone head — base ring at shaftEnd, apex at length
+        // Cone head: base ring at shaftEnd, apex at length
         let baseStart = UInt32(verts.count / 6)
-        appendCylinderRing(into: &verts, origin: origin + dir * shaftEnd, axis: dir, u: u, v: v, radius: coneBaseRadius, sides: sides)
+        appendCylinderRing(
+            into: &verts, origin: origin + dir * shaftEnd, axis: dir, u: u, v: v,
+            radius: coneBaseRadius, sides: sides)
         let apexIndex = UInt32(verts.count / 6)
         let apex = origin + dir * length
         verts.append(contentsOf: [apex.x, apex.y, apex.z, dir.x, dir.y, dir.z])
@@ -49,7 +56,9 @@ enum ManipulatorGeometry {
         let capCenterIndex = UInt32(verts.count / 6)
         let backNormal = -dir
         let capCenter = origin + dir * shaftEnd
-        verts.append(contentsOf: [capCenter.x, capCenter.y, capCenter.z, backNormal.x, backNormal.y, backNormal.z])
+        verts.append(contentsOf: [
+            capCenter.x, capCenter.y, capCenter.z, backNormal.x, backNormal.y, backNormal.z,
+        ])
         for i in 0..<sides {
             indices.append(capCenterIndex)
             indices.append(baseStart + UInt32((i + 1) % sides))
@@ -71,6 +80,7 @@ enum ManipulatorGeometry {
     }
 
     /// Conservative axis-aligned-bounding-box for an arrow in world space.
+    ///
     /// Used by the CPU hit-test to avoid intersecting every triangle.
     static func axisArrowBoundingSphere(
         origin: SIMD3<Float>,
@@ -126,10 +136,10 @@ enum ManipulatorGeometry {
             let i1 = (i + 1) % sides
             for j in 0..<tubeSides {
                 let j1 = (j + 1) % tubeSides
-                let a = UInt32(i  * tubeSides + j)
+                let a = UInt32(i * tubeSides + j)
                 let b = UInt32(i1 * tubeSides + j)
                 let c = UInt32(i1 * tubeSides + j1)
-                let d = UInt32(i  * tubeSides + j1)
+                let d = UInt32(i * tubeSides + j1)
                 indices.append(contentsOf: [a, b, c, a, c, d])
             }
         }
@@ -185,7 +195,8 @@ enum ManipulatorGeometry {
     }
 
     /// Two orthogonal unit vectors spanning the plane perpendicular to `normal`.
-    private static func orthonormalBasis(forNormal n: SIMD3<Float>) -> (SIMD3<Float>, SIMD3<Float>) {
+    private static func orthonormalBasis(forNormal n: SIMD3<Float>) -> (SIMD3<Float>, SIMD3<Float>)
+    {
         let nn = simd_normalize(n)
         let helper: SIMD3<Float> = abs(nn.x) < 0.9 ? .init(1, 0, 0) : .init(0, 1, 0)
         let u = simd_normalize(simd_cross(helper, nn))

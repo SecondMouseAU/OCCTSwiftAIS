@@ -25,10 +25,11 @@ public struct Selection: Hashable, Sendable {
         Set(subshapes.map(\.object))
     }
 
-    /// Concrete `Face` handles for any `.face(...)` entries. Order is unspecified.
-    /// Resolved directly from the ref's captured `Shape` — no ordinal round-trip
-    /// through `Shape.subShape(type:index:)` (see `SubShapeRef`'s documentation
-    /// for why that round-trip is unsafe).
+    /// Concrete `Face` handles for any `.face(...)` entries.
+    ///
+    /// Order is unspecified. Resolved directly from the ref's captured
+    /// `Shape`: no ordinal round-trip through `Shape.subShape(type:index:)`
+    /// (see `SubShapeRef's` documentation for why that round-trip is unsafe).
     public var faces: [Face] {
         subshapes.compactMap { sub in
             guard case .face(_, let ref) = sub else { return nil }
@@ -36,7 +37,9 @@ public struct Selection: Hashable, Sendable {
         }
     }
 
-    /// Concrete `Edge` handles for any `.edge(...)` entries. Order is unspecified.
+    /// Concrete `Edge` handles for any `.edge(...)` entries.
+    ///
+    /// Order is unspecified.
     public var edges: [Edge] {
         subshapes.compactMap { sub in
             guard case .edge(_, let ref) = sub else { return nil }
@@ -44,9 +47,11 @@ public struct Selection: Hashable, Sendable {
         }
     }
 
-    /// World-space positions of any `.vertex(...)` entries. Order is unspecified.
-    /// Returns vertex coordinates rather than a rich type — OCCTSwift exposes
-    /// vertices as positional `SIMD3<Double>` values, not a `Vertex` class.
+    /// World-space positions of any `.vertex(...)` entries.
+    ///
+    /// Order is unspecified. Returns vertex coordinates rather than a rich
+    /// type: OCCTSwift exposes vertices as positional `SIMD3<Double>`
+    /// values, not a `Vertex` class.
     public var vertices: [SIMD3<Double>] {
         subshapes.compactMap { sub in
             guard case .vertex(_, let ref) = sub else { return nil }

@@ -1,8 +1,9 @@
-import Testing
-import simd
-import SwiftUI
 import OCCTSwift
 import OCCTSwiftViewport
+import SwiftUI
+import Testing
+import simd
+
 @testable import OCCTSwiftAIS
 
 @MainActor
@@ -13,7 +14,7 @@ struct ManipulatorGestureTests {
 
     private func makeContext() -> InteractiveContext {
         // The default ViewportController state (rotation = identity, distance = 10)
-        // looks straight down -Z at the origin — fine for X-axis hit-tests.
+        // looks straight down -Z at the origin: fine for X-axis hit-tests.
         InteractiveContext(viewport: ViewportController())
     }
 
@@ -27,9 +28,10 @@ struct ManipulatorGestureTests {
         return CGPoint(x: x, y: y)
     }
 
-    /// NDC of `worldPoint` under the context's *current* camera + aspect — the
+    /// NDC of `worldPoint` under the context's *current* camera + aspect: the
     /// coordinator reads these from the same source at gesture time.
-    private func ndc(of worldPoint: SIMD3<Float>, in ctx: InteractiveContext) throws -> SIMD2<Float> {
+    private func ndc(of worldPoint: SIMD3<Float>, in ctx: InteractiveContext) throws -> SIMD2<Float>
+    {
         let cam = ctx.viewport.cameraState
         let aspect = ctx.viewport.lastAspectRatio
         let vp = cam.projectionMatrix(aspectRatio: aspect) * cam.viewMatrix
@@ -107,14 +109,15 @@ struct ManipulatorGestureTests {
         widget.install(in: ctx)
         let coord = ManipulatorGestureCoordinator(widget: widget)
 
-        // Start unambiguously on the X arrow shaft — at the origin all three
+        // Start unambiguously on the X arrow shaft: at the origin all three
         // arrows overlap in NDC and depth-ordering picks the closest-to-camera.
         let startPoint = point(forNDC: try ndc(of: SIMD3<Float>(1, 0, 0), in: ctx))
-        let endPoint   = point(forNDC: try ndc(of: SIMD3<Float>(1.5, 0, 0), in: ctx))
+        let endPoint = point(forNDC: try ndc(of: SIMD3<Float>(1.5, 0, 0), in: ctx))
 
         // First call decides .widget(.x); second forwards updateDrag.
         coord.onChanged(location: startPoint, translation: CGSize.zero, in: Self.viewSize)
-        coord.onChanged(location: endPoint, translation: CGSize(width: 50, height: 0), in: Self.viewSize)
+        coord.onChanged(
+            location: endPoint, translation: CGSize(width: 50, height: 0), in: Self.viewSize)
 
         #expect(coord.mode == ManipulatorGestureCoordinator.Mode.widget(.x))
         #expect(widget.transform.columns.3.x > 0.1, "X translation should grow as drag progresses")
@@ -130,15 +133,20 @@ struct ManipulatorGestureTests {
 
         let initialState = ctx.viewport.cameraState
 
-        // Drag starts off-handle, then continues — coordinator should call orbit.
+        // Drag starts off-handle, then continues: coordinator should call orbit.
         let p0 = point(forNDC: SIMD2<Float>(0.95, -0.95))
         coord.onChanged(location: p0, translation: CGSize.zero, in: Self.viewSize)
-        coord.onChanged(location: CGPoint(x: 1900, y: 100), translation: CGSize(width: 100, height: -50), in: Self.viewSize)
-        coord.onChanged(location: CGPoint(x: 1880, y: 120), translation: CGSize(width: 80, height: -30), in: Self.viewSize)
+        coord.onChanged(
+            location: CGPoint(x: 1900, y: 100), translation: CGSize(width: 100, height: -50),
+            in: Self.viewSize)
+        coord.onChanged(
+            location: CGPoint(x: 1880, y: 120), translation: CGSize(width: 80, height: -30),
+            in: Self.viewSize)
 
         // Camera state should have shifted (orbit was forwarded).
-        #expect(ctx.viewport.cameraState.rotation != initialState.rotation,
-                "controller.handleOrbit should have rotated the camera")
+        #expect(
+            ctx.viewport.cameraState.rotation != initialState.rotation,
+            "controller.handleOrbit should have rotated the camera")
     }
 
     @Test func t_endDrag_widgetMode_firesCommitAndResetsToIdle() throws {
@@ -179,7 +187,7 @@ struct ManipulatorGestureTests {
     }
 
     @Test func t_widgetWithoutContext_isHandledGracefully() {
-        // A widget that was never installed has nil context — the coordinator
+        // A widget that was never installed has nil context: the coordinator
         // should bail without crashing.
         let shape = OCCTSwift.Shape.box(width: 1, height: 1, depth: 1)!
         let obj = InteractiveObject(shape: shape)

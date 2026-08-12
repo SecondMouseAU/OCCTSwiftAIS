@@ -1,9 +1,9 @@
-import SwiftUI
 import OCCTSwiftViewport
+import SwiftUI
 
 /// Which interaction a drag gesture performs once `.attachAreaSelection(_:)`
 /// is installed. `.navigate` (the default) passes the drag straight through
-/// to camera orbit — exactly as if the modifier weren't attached at all —
+/// to camera orbit (exactly as if the modifier weren't attached at all),
 /// since there's no hit-test to arbitrate on the way `ManipulatorWidget` does
 /// for gizmo handles; switching to `.rectangle`/`.lasso` is an explicit,
 /// app-driven choice (a "select tool" toggle), matching how most CAD apps
@@ -14,8 +14,9 @@ public enum AreaSelectionTool: Sendable, Equatable {
     case lasso
 }
 
-/// Drag-gesture state for rectangle/lasso area selection. Bind one to a
-/// viewport view via `.attachAreaSelection(_:)`.
+/// Drag-gesture state for rectangle/lasso area selection.
+///
+/// Bind one to a viewport view via `.attachAreaSelection(_:)`.
 @MainActor
 public final class AreaSelectionController: ObservableObject {
     public let context: InteractiveContext
@@ -25,7 +26,8 @@ public final class AreaSelectionController: ObservableObject {
     public var scheme: SelectionScheme = .replace
 
     /// Current drag path, in the gesture-receiving view's local coordinates
-    /// (top-left origin, Y-down, same as `DragGesture`'s own locations).
+    /// (top-left origin, Y-down, same as `DragGesture's` own locations).
+    ///
     /// `[start, current]` while dragging a rectangle; the full point sequence
     /// while dragging a lasso. Read by the rubber-band/lasso overlay.
     @Published fileprivate(set) var dragPoints: [CGPoint] = []
@@ -35,19 +37,20 @@ public final class AreaSelectionController: ObservableObject {
     }
 }
 
-public extension View {
+extension View {
     /// Wrap a viewport view (e.g. `MetalViewportView`) with rectangle/lasso
     /// area-selection drag handling and a live rubber-band/lasso overlay.
+    ///
     /// While `controller.tool == .navigate`, drags pass through to camera
     /// orbit unchanged.
-    func attachAreaSelection(_ controller: AreaSelectionController) -> some View {
+    public func attachAreaSelection(_ controller: AreaSelectionController) -> some View {
         modifier(AreaSelectionGestureModifier(controller: controller))
     }
 }
 
 /// State and decision logic for the area-selection gesture, factored out so
-/// it can be unit-tested independently of SwiftUI's gesture machinery — mirrors
-/// `ManipulatorGestureCoordinator`'s split for the same reason.
+/// it can be unit-tested independently of SwiftUI's gesture machinery,
+/// mirroring `ManipulatorGestureCoordinator's` split for the same reason.
 @MainActor
 final class AreaSelectionGestureCoordinator {
     let controller: AreaSelectionController
@@ -58,7 +61,9 @@ final class AreaSelectionGestureCoordinator {
         self.controller = controller
     }
 
-    func onChanged(location: CGPoint, startLocation: CGPoint, translation: CGSize, in viewSize: CGSize) {
+    func onChanged(
+        location: CGPoint, startLocation: CGPoint, translation: CGSize, in viewSize: CGSize
+    ) {
         viewportSize = viewSize
         switch controller.tool {
         case .navigate:
@@ -87,14 +92,17 @@ final class AreaSelectionGestureCoordinator {
             controller.context.viewport.endOrbit(velocity: .zero)
 
         case .rectangle:
-            guard let start = controller.dragPoints.first, let end = controller.dragPoints.last else { return }
+            guard let start = controller.dragPoints.first, let end = controller.dragPoints.last
+            else { return }
             controller.context.selectRectangle(
-                from: start, to: end, mode: controller.mode, scheme: controller.scheme, viewportSize: viewportSize
+                from: start, to: end, mode: controller.mode, scheme: controller.scheme,
+                viewportSize: viewportSize
             )
 
         case .lasso:
             controller.context.selectPolygon(
-                controller.dragPoints, mode: controller.mode, scheme: controller.scheme, viewportSize: viewportSize
+                controller.dragPoints, mode: controller.mode, scheme: controller.scheme,
+                viewportSize: viewportSize
             )
         }
     }
@@ -132,7 +140,9 @@ struct AreaSelectionGestureModifier: ViewModifier {
             }
     }
 
-    private func coordinator(for controller: AreaSelectionController) -> AreaSelectionGestureCoordinator {
+    private func coordinator(for controller: AreaSelectionController)
+        -> AreaSelectionGestureCoordinator
+    {
         if let existing = coordinator, existing.controller === controller { return existing }
         let new = AreaSelectionGestureCoordinator(controller: controller)
         coordinator = new
@@ -165,14 +175,15 @@ struct AreaSelectionGestureModifier: ViewModifier {
             if controller.dragPoints.count >= 2 {
                 ZStack {
                     LassoShape(points: controller.dragPoints).fill(Color.accentColor.opacity(0.15))
-                    LassoShape(points: controller.dragPoints).stroke(Color.accentColor, lineWidth: 1)
+                    LassoShape(points: controller.dragPoints).stroke(
+                        Color.accentColor, lineWidth: 1)
                 }
             }
         }
     }
 }
 
-/// A closed polyline through `points` — the lasso's rubber-band outline.
+/// A closed polyline through `points`: the lasso's rubber-band outline.
 private struct LassoShape: Shape {
     let points: [CGPoint]
 

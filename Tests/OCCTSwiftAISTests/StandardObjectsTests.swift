@@ -1,6 +1,7 @@
+import OCCTSwiftViewport
 import Testing
 import simd
-import OCCTSwiftViewport
+
 @testable import OCCTSwiftAIS
 
 @Suite("StandardObjects")
@@ -40,7 +41,7 @@ struct StandardObjectsTests {
 
     @Test func t_trihedron_axisLengthScalesGeometry() {
         let small = Trihedron(at: .zero, axisLength: 1.0).makeBodies()
-        let big   = Trihedron(at: .zero, axisLength: 10.0).makeBodies()
+        let big = Trihedron(at: .zero, axisLength: 10.0).makeBodies()
         // Bigger trihedron must have a wider vertex bbox.
         #expect(boundsExtent(big) > boundsExtent(small) * 5)
     }
@@ -55,7 +56,8 @@ struct StandardObjectsTests {
 
     @Test func t_workPlane_normalIsApplied() {
         // A plane with normal (0,0,1) should have all vertex normals == (0,0,1).
-        let body = try? #require(WorkPlane(origin: .zero, normal: SIMD3<Float>(0, 0, 1)).makeBodies().first)
+        let body = try? #require(
+            WorkPlane(origin: .zero, normal: SIMD3<Float>(0, 0, 1)).makeBodies().first)
         if let body {
             let stride = 6
             var i = 3
@@ -70,7 +72,7 @@ struct StandardObjectsTests {
 
     @Test func t_workPlane_sizeAffectsExtent() {
         let small = WorkPlane(origin: .zero, normal: .init(0, 0, 1), size: 1).makeBodies()
-        let big   = WorkPlane(origin: .zero, normal: .init(0, 0, 1), size: 10).makeBodies()
+        let big = WorkPlane(origin: .zero, normal: .init(0, 0, 1), size: 10).makeBodies()
         #expect(boundsExtent(big) > boundsExtent(small) * 5)
     }
 
@@ -99,7 +101,9 @@ struct StandardObjectsTests {
     }
 
     @Test func t_axis_color_appliedFromInitParameter() {
-        let bodies = Axis(from: .zero, to: SIMD3<Float>(1, 0, 0), color: SIMD3<Float>(0.5, 0.7, 0.9)).makeBodies()
+        let bodies = Axis(
+            from: .zero, to: SIMD3<Float>(1, 0, 0), color: SIMD3<Float>(0.5, 0.7, 0.9)
+        ).makeBodies()
         let body = try? #require(bodies.first)
         if let body {
             #expect(abs(body.color.x - 0.5) < 1e-5)
@@ -154,7 +158,7 @@ struct StandardObjectsTests {
     // MARK: - Helpers
 
     private func bbox(of body: ViewportBody) -> (SIMD3<Float>, SIMD3<Float>) {
-        var minP = SIMD3<Float>(repeating:  .infinity)
+        var minP = SIMD3<Float>(repeating: .infinity)
         var maxP = SIMD3<Float>(repeating: -.infinity)
         var i = 0
         while i + 2 < body.vertexData.count {
@@ -167,7 +171,7 @@ struct StandardObjectsTests {
     }
 
     private func boundsExtent(_ bodies: [ViewportBody]) -> Float {
-        var minP = SIMD3<Float>(repeating:  .infinity)
+        var minP = SIMD3<Float>(repeating: .infinity)
         var maxP = SIMD3<Float>(repeating: -.infinity)
         for body in bodies {
             let (lo, hi) = bbox(of: body)

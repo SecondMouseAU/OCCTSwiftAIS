@@ -1,7 +1,8 @@
-import Testing
-import simd
 import OCCTSwift
 import OCCTSwiftViewport
+import Testing
+import simd
+
 @testable import OCCTSwiftAIS
 
 @MainActor
@@ -17,14 +18,18 @@ struct EdgeVertexSelectionTests {
     }
 
     /// Synthesise a `PickResult` with a specific kind + primitive index for a
-    /// given body. Mirrors the renderer's bit-packing: `objectIndex | (primitiveID << 16) | (kind << 30)`.
+    /// given body.
+    ///
+    /// Mirrors the renderer's bit-packing:
+    /// `objectIndex | (primitiveID << 16) | (kind << 30)`.
     private func makePick(
         bodyID: String,
         bodyIndex: Int = 0,
         primitiveIndex: Int,
         kind: PrimitiveKind
     ) throws -> PickResult {
-        let raw = UInt32(bodyIndex & 0xFFFF)
+        let raw =
+            UInt32(bodyIndex & 0xFFFF)
             | (UInt32(primitiveIndex & 0x3FFF) << 16)
             | (UInt32(kind.rawValue) << 30)
         return try #require(PickResult(rawValue: raw, indexMap: [bodyIndex: bodyID]))
@@ -36,7 +41,8 @@ struct EdgeVertexSelectionTests {
         let ctx = makeContext()
         _ = ctx.display(try makeBox())
         let body = try #require(ctx.bodies.first)
-        #expect(!body.edgeIndices.isEmpty, "display() must populate edgeIndices for v0.55.0+ pick pass")
+        #expect(
+            !body.edgeIndices.isEmpty, "display() must populate edgeIndices for v0.55.0+ pick pass")
         // Length should equal flattened line-segment count: sum of (poly.points - 1).
         #expect(body.edgeIndices.count == body.edges.reduce(0) { $0 + max($1.count - 1, 0) })
     }
@@ -47,7 +53,7 @@ struct EdgeVertexSelectionTests {
         let body = try #require(ctx.bodies.first)
         #expect(!body.vertices.isEmpty, "display() must populate vertices for v0.55.0+ pick pass")
         #expect(body.vertexIndices.count == body.vertices.count)
-        // A box has 8 corners — Shape.vertices() should report exactly 8.
+        // A box has 8 corners: Shape.vertices() should report exactly 8.
         #expect(body.vertices.count == 8, "expected 8 corners, got \(body.vertices.count)")
         _ = obj
     }
@@ -62,7 +68,7 @@ struct EdgeVertexSelectionTests {
         }
     }
 
-    // MARK: - handlePick — face/edge/vertex dispatch
+    // MARK: - handlePick: face/edge/vertex dispatch
 
     @Test func t_handlePick_kindFace_resolvesToFaceSubShape() throws {
         let ctx = makeContext()
@@ -134,7 +140,8 @@ struct EdgeVertexSelectionTests {
         ctx.selectionMode = [.edge]
         let obj = ctx.display(try makeBox())
         let body = try #require(ctx.bodies.first)
-        let pick = try makePick(bodyID: body.id, primitiveIndex: body.edgeIndices.count + 100, kind: .edge)
+        let pick = try makePick(
+            bodyID: body.id, primitiveIndex: body.edgeIndices.count + 100, kind: .edge)
         ctx.handlePick(pick)
         #expect(ctx.selection.isEmpty)
         _ = obj
@@ -192,15 +199,24 @@ struct EdgeVertexSelectionTests {
 
         // Pick a face → .face entry.
         ctx.handlePick(try makePick(bodyID: body.id, primitiveIndex: 0, kind: .face))
-        #expect(ctx.selection.subshapes.allSatisfy { if case .face = $0 { return true } else { return false } })
+        #expect(
+            ctx.selection.subshapes.allSatisfy {
+                if case .face = $0 { return true } else { return false }
+            })
 
         // Pick an edge → replaces with .edge entry.
         ctx.handlePick(try makePick(bodyID: body.id, primitiveIndex: 0, kind: .edge))
-        #expect(ctx.selection.subshapes.allSatisfy { if case .edge = $0 { return true } else { return false } })
+        #expect(
+            ctx.selection.subshapes.allSatisfy {
+                if case .edge = $0 { return true } else { return false }
+            })
 
         // Pick a vertex → replaces with .vertex entry.
         ctx.handlePick(try makePick(bodyID: body.id, primitiveIndex: 0, kind: .vertex))
-        #expect(ctx.selection.subshapes.allSatisfy { if case .vertex = $0 { return true } else { return false } })
+        #expect(
+            ctx.selection.subshapes.allSatisfy {
+                if case .vertex = $0 { return true } else { return false }
+            })
         _ = obj
     }
 }

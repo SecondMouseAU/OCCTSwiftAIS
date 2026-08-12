@@ -1,5 +1,6 @@
-import Testing
 import OCCTSwift
+import Testing
+
 @testable import OCCTSwiftAIS
 
 @Suite("Selection")
@@ -45,13 +46,13 @@ struct SelectionTests {
         let s = Selection([
             .face(obj, ref: SubShapeRef(shape: face0, ordinal: 0)),
             .face(obj, ref: SubShapeRef(shape: face1, ordinal: 1)),
-            .body(obj),                 // should be excluded from .faces
+            .body(obj),  // should be excluded from .faces
         ])
         #expect(s.faces.count == 2)
     }
 
     @Test func t_faces_droppedWhenRefShapeIsNotActuallyAFace() throws {
-        // `.faces` resolves directly from `ref.shape` (no ordinal round-trip —
+        // `.faces` resolves directly from `ref.shape` (no ordinal round-trip;
         // see SubShapeRef's docs); a ref whose shape isn't a TopoDS_Face is
         // dropped by `Face(_:)`'s failable init, same end result as the old
         // out-of-range-index case but for the new reason.

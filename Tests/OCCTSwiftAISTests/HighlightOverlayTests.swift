@@ -1,7 +1,8 @@
-import Testing
-import simd
 import OCCTSwift
 import OCCTSwiftViewport
+import Testing
+import simd
+
 @testable import OCCTSwiftAIS
 
 @MainActor
@@ -33,15 +34,17 @@ struct HighlightOverlayTests {
 
         let body = try #require(sourceBody(ctx, target: obj))
         let triangleCount = body.indices.count / 3
-        #expect(body.triangleStyles.count == triangleCount,
-                "triangleStyles should be sized to the triangle count once a face is selected")
+        #expect(
+            body.triangleStyles.count == triangleCount,
+            "triangleStyles should be sized to the triangle count once a face is selected")
         // At least one triangle must be highlighted (a box face is two triangles).
         let highlighted = body.triangleStyles.filter { $0.color.w > 0 }.count
         #expect(highlighted >= 2)
         // Every highlighted triangle should map back to face index 0.
         for (idx, style) in body.triangleStyles.enumerated() where style.color.w > 0 {
-            #expect(Int(body.faceIndices[idx]) == 0,
-                    "highlighted triangle \(idx) should belong to face 0, got \(body.faceIndices[idx])")
+            #expect(
+                Int(body.faceIndices[idx]) == 0,
+                "highlighted triangle \(idx) should belong to face 0, got \(body.faceIndices[idx])")
         }
     }
 
@@ -60,11 +63,12 @@ struct HighlightOverlayTests {
         let ctx = makeContext()
         ctx.selectionMode = [.face]
         let obj = ctx.display(try makeBox())
-        ctx.setHighlightStyle(HighlightStyle(
-            selectionColor: SIMD3<Float>(0.2, 0.4, 0.6),
-            hoverColor: .zero,
-            outlineWidth: 1
-        ))
+        ctx.setHighlightStyle(
+            HighlightStyle(
+                selectionColor: SIMD3<Float>(0.2, 0.4, 0.6),
+                hoverColor: .zero,
+                outlineWidth: 1
+            ))
         ctx.select(.face(obj, ref: SubShapeRef(shape: obj.shape, ordinal: 0)))
 
         let body = try #require(sourceBody(ctx, target: obj))
@@ -81,11 +85,12 @@ struct HighlightOverlayTests {
         ctx.selectionMode = [.face]
         let obj = ctx.display(try makeBox())
         ctx.select(.face(obj, ref: SubShapeRef(shape: obj.shape, ordinal: 0)))
-        ctx.setHighlightStyle(HighlightStyle(
-            selectionColor: SIMD3<Float>(0, 1, 0),
-            hoverColor: .zero,
-            outlineWidth: 1
-        ))
+        ctx.setHighlightStyle(
+            HighlightStyle(
+                selectionColor: SIMD3<Float>(0, 1, 0),
+                hoverColor: .zero,
+                outlineWidth: 1
+            ))
         let body = try #require(sourceBody(ctx, target: obj))
         let firstHighlight = body.triangleStyles.first { $0.color.w > 0 }
         let style = try #require(firstHighlight)
@@ -187,7 +192,8 @@ struct HighlightOverlayTests {
         let obj = ctx.display(try makeBox())
         ctx.select(.body(obj))
         let body = try #require(sourceBody(ctx, target: obj))
-        #expect(body.triangleStyles.isEmpty,
-                "body-level selection routes through viewport.selectedBodyIDs only")
+        #expect(
+            body.triangleStyles.isEmpty,
+            "body-level selection routes through viewport.selectedBodyIDs only")
     }
 }

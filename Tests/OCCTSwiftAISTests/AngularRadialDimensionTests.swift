@@ -1,7 +1,8 @@
-import Testing
-import simd
 import OCCTSwift
 import OCCTSwiftViewport
+import Testing
+import simd
+
 @testable import OCCTSwiftAIS
 
 @MainActor
@@ -36,7 +37,9 @@ struct AngularRadialDimensionTests {
         let ctx = makeContext()
         let obj = ctx.display(try makeBox())
         let dim = AngularDimension(
-            arms: (.vertex(obj, ref: try vertexRef(obj, 0)), .vertex(obj, ref: try vertexRef(obj, 2))),
+            arms: (
+                .vertex(obj, ref: try vertexRef(obj, 0)), .vertex(obj, ref: try vertexRef(obj, 2))
+            ),
             apex: .vertex(obj, ref: try vertexRef(obj, 1))
         )
         let pts = dim.anchorPoints
@@ -54,7 +57,9 @@ struct AngularRadialDimensionTests {
         let ctx = makeContext()
         let obj = ctx.display(try makeBox())
         let dim = AngularDimension(
-            arms: (.vertex(obj, ref: try vertexRef(obj, 0)), .vertex(obj, ref: try vertexRef(obj, 2))),
+            arms: (
+                .vertex(obj, ref: try vertexRef(obj, 0)), .vertex(obj, ref: try vertexRef(obj, 2))
+            ),
             apex: .vertex(obj, ref: try vertexRef(obj, 1))
         )
         let label = dim.label
@@ -65,7 +70,9 @@ struct AngularRadialDimensionTests {
         let ctx = makeContext()
         let obj = ctx.display(try makeBox())
         let dim = AngularDimension(
-            arms: (.vertex(obj, ref: try vertexRef(obj, 0)), .vertex(obj, ref: try vertexRef(obj, 1))),
+            arms: (
+                .vertex(obj, ref: try vertexRef(obj, 0)), .vertex(obj, ref: try vertexRef(obj, 1))
+            ),
             apex: .vertex(obj, ref: try vertexRef(obj, 2)),
             customLabel: "RIGHT ANGLE"
         )
@@ -76,7 +83,9 @@ struct AngularRadialDimensionTests {
         let ctx = makeContext()
         let obj = ctx.display(try makeBox())
         let dim = AngularDimension(
-            arms: (.vertex(obj, ref: try vertexRef(obj, 0)), .vertex(obj, ref: try vertexRef(obj, 1))),
+            arms: (
+                .vertex(obj, ref: try vertexRef(obj, 0)), .vertex(obj, ref: try vertexRef(obj, 1))
+            ),
             apex: .vertex(obj, ref: try vertexRef(obj, 2))
         )
         if case .angle(let m) = dim.viewportMeasurement {
@@ -84,8 +93,10 @@ struct AngularRadialDimensionTests {
             // pointA, vertex, pointB ordering.
             let v0 = try #require(obj.shape.vertex(at: 0))
             let v2 = try #require(obj.shape.vertex(at: 2))
-            #expect(simd_distance(m.pointA, SIMD3<Float>(Float(v0.x), Float(v0.y), Float(v0.z))) < 1e-5)
-            #expect(simd_distance(m.vertex, SIMD3<Float>(Float(v2.x), Float(v2.y), Float(v2.z))) < 1e-5)
+            #expect(
+                simd_distance(m.pointA, SIMD3<Float>(Float(v0.x), Float(v0.y), Float(v0.z))) < 1e-5)
+            #expect(
+                simd_distance(m.vertex, SIMD3<Float>(Float(v2.x), Float(v2.y), Float(v2.z))) < 1e-5)
         } else {
             Issue.record("expected .angle variant")
         }
@@ -98,7 +109,9 @@ struct AngularRadialDimensionTests {
         let ctx = makeContext()
         let obj = ctx.display(try makeBox())
         let dim = AngularDimension(
-            arms: (.vertex(obj, ref: try vertexRef(obj, 0)), .vertex(obj, ref: try vertexRef(obj, 0))),
+            arms: (
+                .vertex(obj, ref: try vertexRef(obj, 0)), .vertex(obj, ref: try vertexRef(obj, 0))
+            ),
             apex: .vertex(obj, ref: try vertexRef(obj, 0))
         )
         let d = dim.degrees
@@ -139,12 +152,13 @@ struct AngularRadialDimensionTests {
         let cylinder = try makeCylinder()
         let obj = ctx.display(cylinder)
         let circIdx = try #require(firstCircularEdgeIndex(of: cylinder))
-        let dim = RadialDimension(circularEdge: .edge(obj, ref: try edgeRef(obj, circIdx)), showDiameter: true)
+        let dim = RadialDimension(
+            circularEdge: .edge(obj, ref: try edgeRef(obj, circIdx)), showDiameter: true)
         #expect(dim.label.hasPrefix("\u{2300}"))
     }
 
     @Test func t_radial_onNonCircularEdge_returnsCollapsedAnchors() throws {
-        // A box has no circular edges — picking edge 0 (a straight line) should
+        // A box has no circular edges: picking edge 0 (a straight line) should
         // give back zero anchors and a "?" label.
         let ctx = makeContext()
         let obj = ctx.display(try makeBox())
@@ -169,7 +183,8 @@ struct AngularRadialDimensionTests {
         let cylinder = try makeCylinder()
         let obj = ctx.display(cylinder)
         let circIdx = try #require(firstCircularEdgeIndex(of: cylinder))
-        let dim = RadialDimension(circularEdge: .edge(obj, ref: try edgeRef(obj, circIdx)), showDiameter: true)
+        let dim = RadialDimension(
+            circularEdge: .edge(obj, ref: try edgeRef(obj, circIdx)), showDiameter: true)
         if case .radius(let m) = dim.viewportMeasurement {
             #expect(m.id == dim.id)
             #expect(m.showDiameter == true)
@@ -184,12 +199,15 @@ struct AngularRadialDimensionTests {
         let ctx = makeContext()
         let obj = ctx.display(try makeBox())
         let dim = AngularDimension(
-            arms: (.vertex(obj, ref: try vertexRef(obj, 0)), .vertex(obj, ref: try vertexRef(obj, 1))),
+            arms: (
+                .vertex(obj, ref: try vertexRef(obj, 0)), .vertex(obj, ref: try vertexRef(obj, 1))
+            ),
             apex: .vertex(obj, ref: try vertexRef(obj, 2))
         )
         ctx.add(dim)
         #expect(ctx.viewport.measurements.count == 1)
-        if case .angle = ctx.viewport.measurements.first { } else {
+        if case .angle = ctx.viewport.measurements.first {
+        } else {
             Issue.record("expected .angle in viewport.measurements")
         }
     }
@@ -201,7 +219,8 @@ struct AngularRadialDimensionTests {
         let dim = RadialDimension(circularEdge: .edge(obj, ref: try edgeRef(obj, circIdx)))
         ctx.add(dim)
         #expect(ctx.viewport.measurements.count == 1)
-        if case .radius = ctx.viewport.measurements.first { } else {
+        if case .radius = ctx.viewport.measurements.first {
+        } else {
             Issue.record("expected .radius in viewport.measurements")
         }
     }
@@ -212,11 +231,18 @@ struct AngularRadialDimensionTests {
         let cylObj = ctx.display(try makeCylinder())
         let circIdx = try #require(firstCircularEdgeIndex(of: cylObj.shape))
 
-        let lin = LinearDimension(from: .vertex(obj, ref: try vertexRef(obj, 0)), to: .vertex(obj, ref: try vertexRef(obj, 1)))
-        let ang = AngularDimension(arms: (.vertex(obj, ref: try vertexRef(obj, 0)), .vertex(obj, ref: try vertexRef(obj, 1))), apex: .vertex(obj, ref: try vertexRef(obj, 2)))
+        let lin = LinearDimension(
+            from: .vertex(obj, ref: try vertexRef(obj, 0)),
+            to: .vertex(obj, ref: try vertexRef(obj, 1)))
+        let ang = AngularDimension(
+            arms: (
+                .vertex(obj, ref: try vertexRef(obj, 0)), .vertex(obj, ref: try vertexRef(obj, 1))
+            ), apex: .vertex(obj, ref: try vertexRef(obj, 2)))
         let rad = RadialDimension(circularEdge: .edge(cylObj, ref: try edgeRef(cylObj, circIdx)))
 
-        ctx.add(lin); ctx.add(ang); ctx.add(rad)
+        ctx.add(lin)
+        ctx.add(ang)
+        ctx.add(rad)
         #expect(ctx.viewport.measurements.count == 3)
         #expect(ctx.dimensions.count == 3)
 
