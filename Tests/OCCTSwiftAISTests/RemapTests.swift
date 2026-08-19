@@ -95,9 +95,8 @@ struct RemapTests {
         // touches the top face, so the bottom face's node has no history
         // record and survives via `findDerivedOrSelf`'s untouched case.
         let faces = base.faces()
-        let centroids = base.measure().faceCentroids
         let bottomIndex = try #require(
-            centroids.enumerated().min { $0.element.z < $1.element.z }?.offset)
+            facesWithCentroids(of: base).min { $0.centroid.z < $1.centroid.z }?.index)
         let bottomFace = try #require(Shape.fromFace(faces[bottomIndex]))
         let bottomNode = try #require(graph.findNode(for: bottomFace))
         let pinned = BRepGraph.NodeRef(kind: bottomNode.kind, index: bottomNode.index)
@@ -141,9 +140,8 @@ struct RemapTests {
         let root = BRepGraph.NodeRef(kind: rootNode.kind, index: rootNode.index)
 
         let faces = base.faces()
-        let centroids = base.measure().faceCentroids
         let topIndex = try #require(
-            centroids.enumerated().max { $0.element.z < $1.element.z }?.offset)
+            facesWithCentroids(of: base).max { $0.centroid.z < $1.centroid.z }?.index)
         let topFace = try #require(Shape.fromFace(faces[topIndex]))
         let topNode = try #require(graph.findNode(for: topFace))
         let pinned = BRepGraph.NodeRef(kind: topNode.kind, index: topNode.index)
@@ -191,9 +189,8 @@ struct RemapTests {
         let root = BRepGraph.NodeRef(kind: rootNode.kind, index: rootNode.index)
 
         let faces = base.faces()
-        let centroids = base.measure().faceCentroids
         let topIndex = try #require(
-            centroids.enumerated().max { $0.element.z < $1.element.z }?.offset)
+            facesWithCentroids(of: base).max { $0.centroid.z < $1.centroid.z }?.index)
         let topFace = try #require(Shape.fromFace(faces[topIndex]))
         let topNode = try #require(graph.findNode(for: topFace))
         let pinned = BRepGraph.NodeRef(kind: topNode.kind, index: topNode.index)
@@ -241,9 +238,8 @@ struct RemapTests {
         let root = BRepGraph.NodeRef(kind: rootNode.kind, index: rootNode.index)
 
         let faces = base.faces()
-        let centroids = base.measure().faceCentroids
         let bottomIndex = try #require(
-            centroids.enumerated().min { $0.element.z < $1.element.z }?.offset)
+            facesWithCentroids(of: base).min { $0.centroid.z < $1.centroid.z }?.index)
         let bottomFace = try #require(Shape.fromFace(faces[bottomIndex]))
         let bottomNode = try #require(graph.findNode(for: bottomFace))
         let pinned = BRepGraph.NodeRef(kind: bottomNode.kind, index: bottomNode.index)

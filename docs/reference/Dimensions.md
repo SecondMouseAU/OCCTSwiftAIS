@@ -29,10 +29,22 @@ public protocol Dimension: AnyObject, Sendable {
 }
 ```
 
-- `id` — stable id tracked across add / remove cycles.
-- `label` — human-readable text (e.g. `"5.32"`); customise via the initialiser's `customLabel`.
-- `anchorPoints` — world-space anchors in the order the concrete type expects.
-- `viewportMeasurement` — the renderer-overlay form.
+- `id`: stable id tracked across add / remove cycles.
+- `label`: human-readable text (e.g. `"5.32"`); customise via the initialiser's `customLabel`.
+- `anchorPoints`: world-space anchors in the order the concrete type expects, or `[]` when any
+  anchor fails to resolve.
+- `viewportMeasurement`: the renderer-overlay form.
+
+An anchor fails to resolve when the underlying geometry cannot supply a point: `Shape.bounds` and
+`Face.bounds` are Optional (OCCTSwift 3.0.0), `Face(ref.shape)` / `Edge(ref.shape)` return nil for a
+sub-shape of another kind, and `ref.shape.vertices()` can be empty. An unresolvable `LinearDimension`
+or `AngularDimension` reports `anchorPoints == []`, a `nan` measurement, and a `"?"` label, and
+`InteractiveContext.add(_:)` registers it without pushing a measurement to the overlay, so it draws
+nothing rather than being drawn at the world origin. `refreshDimensionMeasurement(_:)` adds the
+annotation once the anchors resolve and removes it if they stop.
+
+`RadialDimension` keeps its own older contract: `[.zero, .zero]` rather than `[]` for a sub-shape
+that is not a circular edge, so it is still drawn.
 
 ---
 
@@ -52,7 +64,7 @@ public final class LinearDimension: Dimension, @unchecked Sendable {
     public init(from: SubShape, to: SubShape,
                 plane: WorkPlane? = nil, customLabel: String? = nil, id: String? = nil)
 
-    public var anchorPoints: [SIMD3<Float>] { get }   // [from, to] (after optional projection)
+    public var anchorPoints: [SIMD3<Float>] { get }   // [from, to] after optional projection; [] if unresolvable
     public var distance: Float { get }                // nan if an anchor fails to resolve
     public var label: String { get }                  // customLabel, else formatted distance
 }
@@ -87,7 +99,7 @@ public final class AngularDimension: Dimension, @unchecked Sendable {
     public init(arms: (SubShape, SubShape), apex: SubShape,
                 customLabel: String? = nil, id: String? = nil)
 
-    public var anchorPoints: [SIMD3<Float>] { get }   // [armA, apex, armB]
+    public var anchorPoints: [SIMD3<Float>] { get }   // [armA, apex, armB]; [] if unresolvable
     public var degrees: Float { get }                 // angle at apex; nan if an arm coincides
     public var label: String { get }                  // customLabel, else "%.1f°"
 }

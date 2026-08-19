@@ -22,6 +22,18 @@ func vertexRef(_ object: InteractiveObject, _ index: Int) throws -> SubShapeRef 
         shape: try #require(object.shape.subShape(type: .vertex, index: index)), ordinal: index)
 }
 
+/// Indices into `shape.faces()` paired with each face's resolved surface
+/// centroid, for tests that pin a face by picking an extreme along an axis.
+///
+/// `ShapeMeasurements.faceCentroids` is an array of optionals, since a face
+/// whose surface mass is zero has no centroid, so a face that did not resolve
+/// is dropped here rather than compared as if its centroid sat at the origin.
+func facesWithCentroids(of shape: OCCTSwift.Shape) -> [(index: Int, centroid: SIMD3<Double>)] {
+    shape.measure().faceCentroids.enumerated().compactMap { index, centroid in
+        centroid.map { (index: index, centroid: $0) }
+    }
+}
+
 /// Test-only helpers for asserting against `SubShape`s produced by
 /// `InteractiveContext.handlePick`. These compare by render-path `ordinal`
 /// only, ignoring `SubShapeRef.uid`: tests assert against the ordinal the

@@ -7,6 +7,46 @@ nav_order: 5
 
 Most recent first. Breaking changes and deprecations documented here.
 
+## Unreleased
+
+Migrate to OCCTSwift 3.0.0. Closes [#44](https://github.com/SecondMouseAU/OCCTSwiftAIS/issues/44).
+
+There is no direct OCCTSwift pin in this repo: the kernel arrives through `OCCTSwiftTools`, and
+OCCTSwift 3.0.0 lands inside the existing `1.6.1..<2.0.0` Tools range. The source breaks are real
+regardless.
+
+**Behaviour change (not source-breaking):** `Shape.bounds`, `Face.bounds` and friends became
+Optional in [OCCTSwift 3.0.0](https://github.com/SecondMouseAU/OCCTSwift/blob/v3.0.0/docs/SEMVER.md#v300),
+returning nil for a shape with no bounding box instead of fabricating `(0,0,0)-(0,0,0)`. That
+distinction is now carried through this repo rather than collapsed back to the origin:
+
+- `DimensionAnchor.resolve(_:)` and its four per-kind resolvers return `SIMD3<Float>?`. A dimension
+  with any unresolvable anchor reports `anchorPoints == []`, a `nan` `distance` / `degrees`, and a
+  `"?"` label. The `nan` path was already documented and is now actually reachable.
+- `InteractiveContext.add(_:)` registers such a dimension but does not push a measurement to the
+  overlay, so it draws nothing instead of being drawn at the world origin.
+  `refreshDimensionMeasurement(_:)` adds the annotation once the anchors resolve and removes it if
+  they stop. `RadialDimension` is deliberately untouched: it reports `[.zero, .zero]` rather than
+  `[]` for a non-circular edge, a contract that predates this change, is asserted by two tests, and
+  does not go through the bounds accessors.
+- `selectRectangle` / `selectPolygon` do not treat an object whose `Shape.bounds` is nil as a
+  `.body` candidate, the same way a sub-shape kind with no identity table is skipped. Previously
+  such an object presented as a zero-size box at the origin and would match any region drawn there.
+
+**Also absorbed here:** two OCCTSwift 2.0.0 breaks this repo never took, because it sat out the
+v2.0.0 fanout on the grounds that it had no direct pin (it still received 2.0.0 transitively through
+Tools 1.6.3). `ShapeMeasurements.faceCentroids` became `[SIMD3<Double>?]`, which broke the test
+target's compile at five sites, now routed through a new `facesWithCentroids(of:)` test helper that
+drops faces with no centroid rather than comparing them as if they sat at the origin.
+
+**Known failure, not fixed here:** `t_sharedFaceBetweenShells_everyPickResolvesToCorrectSubShape`
+fails (5 expectations). OCCTSwift 2.0.0 moved `Shape.faces()` to the deduplicated enumeration and
+added `orientedFaces()` for the occurrence-wise one, which erases the raw-vs-deduplicated split that
+test and the shared-face identity guarantee in
+[#31](https://github.com/SecondMouseAU/OCCTSwiftAIS/issues/31) are built on. Deciding what
+`FaceIdentityTable` should enumerate post-2.0.0 is an OCCTSwiftTools question, not a v3.0.0
+migration fix.
+
 ## v1.3.1 — 2026-07-20
 
 Housekeeping: migrate off deprecated `TopologyGraph` → `BRepGraph`. Closes [#37](https://github.com/SecondMouseAU/OCCTSwiftAIS/issues/37). No behaviour change — pure rename, underlying type unchanged.
