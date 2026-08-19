@@ -112,9 +112,13 @@ struct SelectionFilterTests {
         let smallRadius = AllOfFilter([
             SurfaceTypeFilter([.cylinder]),
             PredicateFilter { sub in
-                guard case .face(_, let ref) = sub, let face = Face(ref.shape) else { return false }
+                // A face with no bounding box has no radius to compare, so it
+                // fails the filter rather than reading as radius zero.
+                guard case .face(_, let ref) = sub, let face = Face(ref.shape),
+                    let bounds = face.bounds
+                else { return false }
                 // Loose bbox-based proxy for radius.
-                return face.bounds.max.x - face.bounds.min.x < 20
+                return bounds.max.x - bounds.min.x < 20
             },
         ])
         #expect(smallRadius.accepts(candidate))

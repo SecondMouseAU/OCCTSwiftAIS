@@ -147,8 +147,12 @@ public final class PredicateFilter: SelectionFilter {
 let smallCylinders = AllOfFilter([
     SurfaceTypeFilter([.cylinder]),
     PredicateFilter { sub in
-        guard case .face(_, let ref) = sub, let face = Face(ref.shape) else { return false }
-        return face.bounds.max.x - face.bounds.min.x < 20
+        // `Face.bounds` is Optional: a face with no bounding box has no size
+        // to compare, so it fails the filter rather than reading as size zero.
+        guard case .face(_, let ref) = sub, let face = Face(ref.shape),
+            let bounds = face.bounds
+        else { return false }
+        return bounds.max.x - bounds.min.x < 20
     },
 ])
 ```

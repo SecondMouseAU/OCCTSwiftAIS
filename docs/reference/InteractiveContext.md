@@ -259,6 +259,11 @@ ais.setHighlightStyle(HighlightStyle(selectionColor: SIMD3<Float>(1, 0.65, 0)))
 Add a dimension to the scene. Pushes its `viewportMeasurement` to `viewport.measurements`, where the
 renderer's overlay picks it up. Idempotent for the same instance (re-adding refreshes its anchors).
 
+A dimension whose anchors do not resolve (`anchorPoints` is `[]`, see
+[Dimensions](Dimensions.md#dimension)) is registered but draws nothing, rather than being drawn at
+the world origin. Call `refreshDimensionMeasurement(_:)` once its anchors can resolve to make it
+appear.
+
 ```swift
 @discardableResult
 public func add<D: Dimension>(_ dimension: D) -> D
@@ -311,6 +316,9 @@ print(ais.dimensions.count)
 
 Re-fetch a dimension's `viewportMeasurement` and replace it in place in `viewport.measurements`. Call
 after the underlying anchors moved (e.g. a target `Shape` mutated).
+
+Anchors that stopped resolving drop the measurement from the overlay, and anchors that started
+resolving add it back.
 
 ```swift
 public func refreshDimensionMeasurement(_ dimension: any Dimension)

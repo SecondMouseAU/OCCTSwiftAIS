@@ -118,7 +118,7 @@ struct LinearDimensionTests {
     @Test func t_bodyAnchor_resolvesToBodyBboxCenter() throws {
         let ctx = makeContext()
         let obj = ctx.display(try makeBox())
-        let (lo, hi) = obj.shape.bounds
+        let (lo, hi) = try #require(obj.shape.bounds)
         let expected = SIMD3<Float>(
             Float((lo.x + hi.x) * 0.5),
             Float((lo.y + hi.y) * 0.5),

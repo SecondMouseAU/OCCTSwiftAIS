@@ -27,9 +27,8 @@ struct InteractiveContextMutationTests {
 
         // Select the bottom face (z=0): neither cut below touches it.
         let faces = base.faces()
-        let centroids = base.measure().faceCentroids
         let bottomIndex = try #require(
-            centroids.enumerated().min { $0.element.z < $1.element.z }?.offset)
+            facesWithCentroids(of: base).min { $0.centroid.z < $1.centroid.z }?.index)
         let identity0 = try #require(ctx.faceIdentityTable(for: obj))
         let bottomShape = try #require(identity0.shape(forOrdinal: bottomIndex))
         let bottomUID = try #require(identity0.uid(forOrdinal: bottomIndex))

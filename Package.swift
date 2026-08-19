@@ -45,6 +45,15 @@ let package = Package(
         // `BRepGraph` (OCCTSwift#333) — required now that this repo's own
         // code names `BRepGraph` directly rather than the deprecated
         // typealias. See #37.
+        //
+        // This repo's source now REQUIRES OCCTSwift ≥3.0.0 (bounds accessors
+        // are Optional, see #44), but there is no direct OCCTSwift pin here to
+        // say so: the kernel arrives through Tools. Tools' 3.0.0 repin
+        // (OCCTSwiftTools#56) had not released when #44 landed, so the floor
+        // below still names 1.6.1 and 3.0.0 arrives only because the newest
+        // Tools in `1.6.1..<2.0.0` happens to carry it. Raise this floor to the
+        // Tools release that carries OCCTSwift 3.0.0 as soon as it ships, so
+        // the requirement is stated rather than left to resolution luck.
         occtDep("OCCTSwiftTools", from: "1.6.1"),
     ],
     targets: [

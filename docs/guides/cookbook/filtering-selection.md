@@ -50,13 +50,17 @@ AllOfFilter([ShapeTypeFilter([.face]), NotFilter(SurfaceTypeFilter([.plane]))])
 // Cylindrical faces OR spherical faces.
 AnyOfFilter([SurfaceTypeFilter([.cylinder]), SurfaceTypeFilter([.sphere])])
 
-// Cylindrical faces under a given size — the closure escape hatch for anything
-// no built-in filter expresses.
+// Cylindrical faces under a given size, the closure escape hatch for anything
+// no built-in filter expresses. `Face.bounds` is Optional (a face with no
+// bounding box has no size to compare), so a face that has none fails the
+// filter rather than reading as size zero.
 AllOfFilter([
     SurfaceTypeFilter([.cylinder]),
     PredicateFilter { sub in
-        guard case .face(_, let ref) = sub, let face = Face(ref.shape) else { return false }
-        return face.bounds.max.x - face.bounds.min.x < 20
+        guard case .face(_, let ref) = sub, let face = Face(ref.shape),
+            let bounds = face.bounds
+        else { return false }
+        return bounds.max.x - bounds.min.x < 20
     },
 ])
 ```

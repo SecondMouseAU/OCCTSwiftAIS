@@ -105,9 +105,11 @@ extension InteractiveContext {
         for object in displayedObjects() {
             guard isVisible(object) else { continue }
 
-            if selectionMode.contains(.body) {
-                let (lo, hi) = object.shape.bounds
-                let corners = boundingBoxCorners(lo: lo, hi: hi)
+            // A shape whose bounding box is void has no screen-space
+            // projection to test, so it is simply not a candidate: same
+            // treatment as a sub-shape whose identity table is missing below.
+            if selectionMode.contains(.body), let bounds = object.shape.bounds {
+                let corners = boundingBoxCorners(lo: bounds.min, hi: bounds.max)
                 let points = project(corners, vpMatrix: vpMatrix, viewportSize: viewportSize)
                 let candidate = SubShape.body(object)
                 if test(points), passesInstalledFilters(candidate) {

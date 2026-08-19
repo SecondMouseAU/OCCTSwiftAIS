@@ -154,12 +154,15 @@ Built-in filters: `SurfaceTypeFilter` (by `Face.SurfaceType`), `CurveTypeFilter`
 a closure escape hatch (`PredicateFilter`):
 
 ```swift
-// Cylindrical faces under a given radius.
+// Cylindrical faces under a given radius. `Face.bounds` is Optional, so a face
+// with no bounding box fails the filter rather than reading as radius zero.
 ais.addFilter(AllOfFilter([
     SurfaceTypeFilter([.cylinder]),
     PredicateFilter { sub in
-        guard case .face(_, let ref) = sub, let face = Face(ref.shape) else { return false }
-        return face.bounds.max.x - face.bounds.min.x < 20
+        guard case .face(_, let ref) = sub, let face = Face(ref.shape),
+            let bounds = face.bounds
+        else { return false }
+        return bounds.max.x - bounds.min.x < 20
     },
 ]))
 ```
@@ -324,7 +327,7 @@ in one go.
 
 ### Anchor resolution by sub-shape kind
 
-Anchors resolve directly from each sub-shape's `SubShapeRef.shape` — never from a re-derived index
+Anchors resolve directly from each sub-shape's `SubShapeRef.shape`, never from a re-derived index
 lookup on the source `Shape`:
 
 | `SubShape` | Anchor world point |
@@ -336,6 +339,13 @@ lookup on the source `Shape`:
 
 These are constant-time lookups. Curved-face area-weighted centroids and arc-length edge midpoints are
 future refinements.
+
+An anchor that cannot resolve (`Shape.bounds` and `Face.bounds` are Optional, so a shape with no
+bounding box has no bbox center) makes the whole dimension unresolvable: `anchorPoints` is `[]`,
+`distance` is `nan`, `label` is `"?"`, and `ais.add(_:)` registers the dimension without drawing it.
+Nothing is placed at the world origin as a stand-in. Call
+`ais.refreshDimensionMeasurement(_:)` once the anchors can resolve to make it appear.
+(`RadialDimension` is the exception: it reports `[.zero, .zero]` for a non-circular edge.)
 
 ## 9. Standard scene objects
 

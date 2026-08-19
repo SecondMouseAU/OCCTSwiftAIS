@@ -59,9 +59,11 @@ public final class LinearDimension: Dimension, @unchecked Sendable {
         self.customLabel = customLabel
     }
 
+    /// `[from, to]`, or `[]` when either anchor fails to resolve.
     public var anchorPoints: [SIMD3<Float>] {
-        let a = DimensionAnchor.resolve(from)
-        let b = DimensionAnchor.resolve(to)
+        guard let a = DimensionAnchor.resolve(from), let b = DimensionAnchor.resolve(to) else {
+            return []
+        }
         if let plane {
             return [
                 DimensionAnchor.project(a, onto: plane), DimensionAnchor.project(b, onto: plane),
@@ -116,12 +118,16 @@ public final class AngularDimension: Dimension, @unchecked Sendable {
 
     /// `[armA, apex, armB]`: preserves the standard "vertex in the middle"
     /// convention that `ViewportMeasurement.angle` and most CAD apps expect.
+    ///
+    /// `[]` when any of the three anchors fails to resolve.
     public var anchorPoints: [SIMD3<Float>] {
-        [
-            DimensionAnchor.resolve(armA),
-            DimensionAnchor.resolve(apex),
-            DimensionAnchor.resolve(armB),
-        ]
+        guard let a = DimensionAnchor.resolve(armA),
+            let v = DimensionAnchor.resolve(apex),
+            let b = DimensionAnchor.resolve(armB)
+        else {
+            return []
+        }
+        return [a, v, b]
     }
 
     /// Angle at the apex, in degrees.
@@ -220,7 +226,9 @@ public final class RadialDimension: Dimension, @unchecked Sendable {
 /// Used by dimension types.
 enum DimensionAnchor {
 
-    static func resolve(_ subshape: SubShape) -> SIMD3<Float> {
+    /// nil when the sub-shape has no resolvable anchor, e.g. a shape whose
+    /// bounding box is void.
+    static func resolve(_ subshape: SubShape) -> SIMD3<Float>? {
         switch subshape {
         case .body(let obj):
             return resolveBody(obj)
@@ -233,33 +241,32 @@ enum DimensionAnchor {
         }
     }
 
-    private static func resolveBody(_ obj: InteractiveObject) -> SIMD3<Float> {
+    private static func resolveBody(_ obj: InteractiveObject) -> SIMD3<Float>? {
         // Bbox center of the source shape.
-        let (lo, hi) = obj.shape.bounds
-        let center = (lo + hi) * 0.5
+        guard let bounds = obj.shape.bounds else { return nil }
+        let center = (bounds.min + bounds.max) * 0.5
         return SIMD3<Float>(Float(center.x), Float(center.y), Float(center.z))
     }
 
-    private static func resolveFace(_ ref: SubShapeRef) -> SIMD3<Float> {
+    private static func resolveFace(_ ref: SubShapeRef) -> SIMD3<Float>? {
         // Bbox center of the face: cheap, robust for axis-aligned faces.
         // Curved faces would be better served by the area-weighted centroid
         // (`ShapeMeasurements.faceCentroids` from OCCTSwift) but that's an
         // O(faces) computation; bbox center is constant time per face.
-        guard let face = OCCTSwift.Face(ref.shape) else { return .zero }
-        let (lo, hi) = face.bounds
-        let center = (lo + hi) * 0.5
+        guard let face = OCCTSwift.Face(ref.shape), let bounds = face.bounds else { return nil }
+        let center = (bounds.min + bounds.max) * 0.5
         return SIMD3<Float>(Float(center.x), Float(center.y), Float(center.z))
     }
 
-    private static func resolveEdge(_ ref: SubShapeRef) -> SIMD3<Float> {
-        guard let edge = OCCTSwift.Edge(ref.shape) else { return .zero }
+    private static func resolveEdge(_ ref: SubShapeRef) -> SIMD3<Float>? {
+        guard let edge = OCCTSwift.Edge(ref.shape) else { return nil }
         let ends = edge.endpoints
         let mid = (ends.start + ends.end) * 0.5
         return SIMD3<Float>(Float(mid.x), Float(mid.y), Float(mid.z))
     }
 
-    private static func resolveVertex(_ ref: SubShapeRef) -> SIMD3<Float> {
-        guard let p = ref.shape.vertices().first else { return .zero }
+    private static func resolveVertex(_ ref: SubShapeRef) -> SIMD3<Float>? {
+        guard let p = ref.shape.vertices().first else { return nil }
         return SIMD3<Float>(Float(p.x), Float(p.y), Float(p.z))
     }
 
@@ -316,6 +323,11 @@ extension InteractiveContext {
     /// The dimension's `viewportMeasurement` is pushed to
     /// `viewport.measurements`, where the renderer's overlay picks it up
     /// automatically. Idempotent for the same instance.
+    ///
+    /// A dimension whose anchors do not resolve (empty `anchorPoints`) is
+    /// registered but draws nothing, rather than being drawn at the world
+    /// origin. Call `refreshDimensionMeasurement(_:)` once its anchors can
+    /// resolve to make it appear.
     @discardableResult
     public func add<D: Dimension>(_ dimension: D) -> D {
         let oid = ObjectIdentifier(dimension)
@@ -325,7 +337,9 @@ extension InteractiveContext {
             return dimension
         }
         dimensionRegistry[oid] = dimension
-        viewport.measurements.append(dimension.viewportMeasurement)
+        if !dimension.anchorPoints.isEmpty {
+            viewport.measurements.append(dimension.viewportMeasurement)
+        }
         return dimension
     }
 
@@ -347,10 +361,20 @@ extension InteractiveContext {
     ///
     /// Call this if the underlying anchors moved (e.g. a target shape
     /// mutated); for a static scene you don't need it.
+    ///
+    /// Anchors that stopped resolving drop the measurement from the overlay,
+    /// and anchors that started resolving add it back.
     public func refreshDimensionMeasurement(_ dimension: any Dimension) {
         let id = dimension.id
+        let resolves = !dimension.anchorPoints.isEmpty
         if let i = viewport.measurements.firstIndex(where: { $0.id == id }) {
-            viewport.measurements[i] = dimension.viewportMeasurement
+            if resolves {
+                viewport.measurements[i] = dimension.viewportMeasurement
+            } else {
+                viewport.measurements.remove(at: i)
+            }
+        } else if resolves, dimensionRegistry[ObjectIdentifier(dimension)] != nil {
+            viewport.measurements.append(dimension.viewportMeasurement)
         }
     }
 }

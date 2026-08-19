@@ -77,7 +77,8 @@ struct STEPStockIntegrationTests {
     @Test(arguments: stockFixtures)
     func t_stockBounds_areNonDegenerateAndPositive(name: String) async throws {
         let (_, shape) = try await loadStock(name)
-        let (lo, hi) = shape.bounds
+        // A stock fixture is a real solid, so a void bbox is itself a failure.
+        let (lo, hi) = try #require(shape.bounds)
         let extents = SIMD3<Double>(hi.x - lo.x, hi.y - lo.y, hi.z - lo.z)
         // All three extents positive (non-degenerate solid).
         #expect(extents.x > 1.0, "\(name): X extent should be positive, got \(extents.x)")
@@ -195,7 +196,7 @@ struct STEPStockIntegrationTests {
         )
         ctx.add(dim)
         // Distance must approximate one of the box's three extents.
-        let (lo, hi) = shape.bounds
+        let (lo, hi) = try #require(shape.bounds)
         let extents: [Float] = [Float(hi.x - lo.x), Float(hi.y - lo.y), Float(hi.z - lo.z)]
         let matchesExtent = extents.contains { abs(dim.distance - $0) < 0.05 }
         #expect(
@@ -247,7 +248,7 @@ struct STEPStockIntegrationTests {
         // A tool positioned well outside the stock's bounds: the boolean
         // subtract is a geometric no-op, so the selected face's node has no
         // history record and survives via `findDerivedOrSelf`'s untouched case.
-        let (lo, hi) = shape.bounds
+        let (lo, hi) = try #require(shape.bounds)
         let farAway = try #require(
             OCCTSwift.Shape.box(
                 origin: SIMD3<Double>(hi.x + 1000, hi.y + 1000, hi.z + 1000),

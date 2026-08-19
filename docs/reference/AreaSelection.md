@@ -74,6 +74,10 @@ public func selectRectangle(
 - Honours `selectionMode` (only kinds present there are enumerated as candidates) and every installed
   `filters` entry (a candidate a filter rejects doesn't match), exactly like a point pick.
 - Skips objects whose `PresentationStyle.visible` is `false`.
+- A `.body` candidate is tested against its bounding-box corners, so an object whose `Shape.bounds`
+  is nil (no bounding box) is not a body candidate at all, the same way a sub-shape kind with no
+  identity table is skipped. It is never treated as a zero-size box at the world origin, which would
+  otherwise match any region drawn over the origin.
 - **Example:**
 
 ```swift

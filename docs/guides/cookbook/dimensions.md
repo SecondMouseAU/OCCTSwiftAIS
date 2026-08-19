@@ -91,8 +91,8 @@ context. `ais.removeAll()` clears every body, selection, and dimension at once.
 
 ### Anchor resolution
 
-Anchors resolve directly from each sub-shape's `SubShapeRef.shape` — no ordinal round-trip through the
-source `Shape`:
+Anchors resolve directly from each sub-shape's `SubShapeRef.shape`, with no ordinal round-trip
+through the source `Shape`:
 
 | `SubShape` | World anchor |
 | --- | --- |
@@ -102,3 +102,14 @@ source `Shape`:
 | `.vertex(_, ref)` | `ref.shape.vertices().first` |
 
 A `RadialDimension` additionally resolves the circle's center and radius from the edge's 3D curve.
+
+Every row above can fail: `Shape.bounds` and `Face.bounds` are Optional, `Face(ref.shape)` /
+`Edge(ref.shape)` return nil for a sub-shape of another kind, and `vertices()` can be empty. When
+any anchor of a `LinearDimension` or `AngularDimension` fails, `anchorPoints` is `[]`, `distance`
+(or `degrees`) is `nan`, `label` is `"?"`, and `ais.add(_:)` registers the dimension without drawing
+it: a dimension that cannot be placed is not drawn at the world origin instead.
+`ais.refreshDimensionMeasurement(_:)` re-checks, adding the annotation once the anchors resolve and
+dropping it if they stop.
+
+`RadialDimension` is the exception: it reports `[.zero, .zero]` rather than `[]` for a sub-shape
+that is not a circular edge, and so is still drawn.
