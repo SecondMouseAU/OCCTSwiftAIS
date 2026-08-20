@@ -2,7 +2,7 @@ okf_version: 1
 repo: OCCTSwiftAIS
 cluster: kernel
 visibility: public
-status: active
+status: maintenance
 language: Swift
 summary: High-level Application Interactive Services for the OCCTSwift stack — selection-from-topology, manipulator widgets, dimensions, and standard scene objects.
 products: []
