@@ -2,9 +2,9 @@ okf_version: 1
 repo: OCCTSwiftAIS
 cluster: kernel
 visibility: public
-status: maintenance
+status: archived
 language: Swift
-summary: High-level Application Interactive Services for the OCCTSwift stack — selection-from-topology, manipulator widgets, dimensions, and standard scene objects.
+summary: "Archived, merged into OCCTSwiftInteraction (ecosystem#42). Was: High-level Application Interactive Services for the OCCTSwift stack — selection-from-topology, manipulator widgets, dimensions, and standard scene objects."
 products: []
 depends_on: [OCCTSwiftTools]
 maintainer: gsdali
